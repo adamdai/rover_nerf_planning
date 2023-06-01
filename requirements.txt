@@ -1,0 +1,9 @@
+numpy 
+scipy 
+matplotlib
+jupyter
+ipykernel
+ipympl
+plotly
+pandas
+# pymesh (see readme for installation)
