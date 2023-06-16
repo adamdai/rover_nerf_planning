@@ -6,5 +6,6 @@ ipykernel
 ipympl
 plotly
 pandas
+opencv-python
 # pymesh (see readme for installation)
 # pytorch (see readme for installation)
