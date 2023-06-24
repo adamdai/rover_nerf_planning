@@ -7,5 +7,6 @@ ipympl
 plotly
 pandas
 opencv-python
+airsim
 # pymesh (see readme for installation)
 # pytorch (see readme for installation)
