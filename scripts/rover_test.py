@@ -20,6 +20,8 @@ from matplotlib import pyplot as plt
 import cv2 as cv
 import plotly.express as px
 
+from terrain_nerf.autonav import AutoNav
+
 
 ## -------------------------- MAIN ------------------------ ##
 if __name__ == "__main__":
@@ -40,7 +42,8 @@ if __name__ == "__main__":
 
     car_controls.brake = 0
     for i in range(10):
-
+        
+        # Get image
         png_image = client.simGetImage("BirdsEyeCamera", airsim.ImageType.Scene)
         print("captured image")
         decoded = cv.imdecode(np.frombuffer(png_image, np.uint8), -1)
@@ -52,12 +55,15 @@ if __name__ == "__main__":
         # plt.imshow(decoded)
         # plt.show(block=False)
 
+        # Generate costmap
+
+
         # get vehicle position
         car_state = client.getCarState()
         print("car state: %s" % car_state)
 
-        car_controls.steering = 0.0
-        car_controls.throttle = 0.5
+        car_controls.steering = 0.0 
+        car_controls.throttle = 0.5 # units 
         client.setCarControls(car_controls)
 
         time.sleep(3)
