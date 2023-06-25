@@ -16,8 +16,8 @@ def arc(x0, u, N, dt):
         return v * (1 - np.cos((w + eps) * t)) / (w + eps)
 
     traj = np.zeros((N, 3))
-    traj[:,0] = [x0[0] + dx(u[0], u[1], i * dt) for i in range(N)]
-    traj[:,1] = [x0[1] + dy(u[0], u[1], i * dt) for i in range(N)]
+    traj[:,1] = [x0[0] + dx(u[0], u[1], i * dt) for i in range(N)]
+    traj[:,0] = [x0[1] + dy(u[0], u[1], i * dt) for i in range(N)]
     traj[:,2] = x0[2] + u[1] * np.arange(N) * dt
 
     return traj
@@ -28,14 +28,21 @@ class AutoNav:
     def __init__(self):
         """
         """
-
         # Candidate arc parameters
         dt = 0.1
-        N = 50
-        speed = 1.0  # m/s
-        self.omegas = np.linspace(-np.pi/2, np.pi/2, 10)
+        self.arc_duration = 5.0  # seconds
+        N = int(self.arc_duration / dt)
+        N_arcs = 11
+        speed = 2.5  # m/s
+        max_omega = 0.25  # rad/s
+        self.omegas = np.linspace(-max_omega, max_omega, N_arcs)
         self.candidate_arcs = [arc(np.zeros(3), [speed, w], N, dt) for w in self.omegas]
-        self.costmap = np.zeros((21, 21))  # costmap is aligned with rover orientation, 20m x 20m
+
+        # Costmap
+        self.cmap_resolution = 1  # m
+        self.cmap_dims = [41, 41]  # m
+        self.cmap_center = [20, 20]
+        self.costmap = np.zeros(self.cmap_dims)  # costmap is aligned with rover orientation, 40m x 40m
 
         self.visualization = True
 
@@ -43,7 +50,7 @@ class AutoNav:
     def update_costmap(self, image):
         """
         """
-        self.costmap = np.random.rand(21, 21)
+        self.costmap = np.random.rand(self.cmap_dims[0], self.cmap_dims[1])
 
 
     def costmap_val(self, x, y):
@@ -51,13 +58,13 @@ class AutoNav:
         """
         # if x is an array
         if isinstance(x, np.ndarray):
-            return self.costmap[(x + 10 + 0.5).astype(int), (-y + 10 + 0.5).astype(int)]
+            return self.costmap[(x + self.cmap_center[0] + 0.5).astype(int), (-y + self.cmap_center[1] + 0.5).astype(int)]
         # if x is a scalar
         else:
-            return self.costmap[int(x + 10 + 0.5), int(-y + 10 + 0.5)]
+            return self.costmap[int(x + self.cmap_center[0] + 0.5), int(-y + self.cmap_center[1] + 0.5)]
 
     
-    def get_next_arc(self):
+    def replan(self):
         """
         
         """
