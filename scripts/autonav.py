@@ -32,6 +32,8 @@ UNREAL_GOAL = np.array([210111.421875, 111218.84375, 32213.0])
 GOAL_POS = (UNREAL_GOAL - UNREAL_PLAYER_START)[:2] / 100.0
 print("GOAL_POS: ", GOAL_POS)
 
+VISUALIZE = False
+
 global_path = np.load("../data/airsim/global_path.npy")
 goal_tolerance = 30  # meters
 
@@ -53,13 +55,17 @@ if __name__ == "__main__":
     autonav = AutoNav(goal)
 
     # Visualization
-    f, (ax1, ax2) = plt.subplots(1, 2)
-    plt.ion()
-    plt.show()
+    if VISUALIZE:
+        f, (ax1, ax2) = plt.subplots(1, 2)
+        # Set figure size
+        f.set_figwidth(15)
+        f.set_figheight(7)
+        plt.ion()
+        plt.show()
 
     # Parameters
     throttle = 0.5
-    N_iters = 100
+    N_iters = 100000000000000
     idx = 0
 
     # brake the car
@@ -74,8 +80,10 @@ if __name__ == "__main__":
 
     try:
         while idx < N_iters:
+            start_time = time.time()
             current_pose = get_pose2D(client)
             print("current_pose: ", current_pose)
+            print("goal: ", goal)
             if np.linalg.norm(current_pose[:2] - autonav.goal) < goal_tolerance:
                 print("Reached goal!")
                 path_idx += 1
@@ -89,7 +97,6 @@ if __name__ == "__main__":
             # Get image
             png_image = client.simGetImage("BirdsEyeCamera", airsim.ImageType.Scene)
             img_decoded = cv.imdecode(np.frombuffer(png_image, np.uint8), -1)
-            print(img_decoded.shape)
 
             autonav.update_costmap(img_decoded)
             arc, cost, w = autonav.replan(current_pose)
@@ -98,13 +105,16 @@ if __name__ == "__main__":
             car_controls.throttle = throttle
             client.setCarControls(car_controls)
             print("steering: ", car_controls.steering, "throttle: ", car_controls.throttle)
+            print("planning time: ", time.time() - start_time)
+            print("--------------------------------------------------------------------------------")
 
-            # ax2.clear()
-            # ax1.imshow(img_decoded)
-            # ax2.imshow(autonav.costmap, alpha=0.2)
-            # autonav.plot_arcs(ax2)
-            # plt.draw()
-            # plt.pause(.001)
+            if VISUALIZE:
+                ax2.clear()
+                ax1.imshow(img_decoded)
+                im = autonav.plot_costmap(ax2, show_arcs=True)
+                #plt.colorbar(im)  # FIXME: makes a new colorbar every time
+                plt.draw()
+                plt.pause(.001)
 
             time.sleep(autonav.arc_duration)
             idx += 1

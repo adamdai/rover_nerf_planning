@@ -22,13 +22,14 @@ try:
         speed = car_state.speed
         yaw = airsim.utils.to_eularian_angles(pose.orientation)[2]
         print(f"x = {x:.2f}, y = {y:.2f}, z = {z:.2f}, speed = {speed:.2f}, yaw = {yaw:.2f}")
-        state_vals = np.array([x, y, z, speed])
+        state_vals = np.array([x, y, z, speed, yaw])
         states.append(state_vals)
         time.sleep(dt)
 
 except KeyboardInterrupt:
     print("Saving states")
-    np.savez('states.npz', states=states)
+    timestamp = time.strftime("%Y%m%d-%H%M")
+    np.savez(f'../data/airsim/logs/states_{timestamp}.npz', states=states)
     print("Interrupted by user, shutting down")
     client.enableApiControl(False)
     exit()
