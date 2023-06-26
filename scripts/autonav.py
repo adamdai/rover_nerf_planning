@@ -21,6 +21,7 @@ import cv2 as cv
 import plotly.express as px
 
 from terrain_nerf.autonav import AutoNav
+from terrain_nerf.airsim_utils import get_pose2D
 
 ## -------------------------- PARAMS ------------------------ ##
 # Unreal environment
@@ -28,9 +29,11 @@ from terrain_nerf.autonav import AutoNav
 UNREAL_PLAYER_START = np.array([-117252.054688, 264463.03125, 25148.908203])
 UNREAL_GOAL = np.array([210111.421875, 111218.84375, 32213.0])
 
-GOAL = (UNREAL_GOAL - UNREAL_PLAYER_START)[:2] / 100.0
-print(GOAL)
+GOAL_POS = (UNREAL_GOAL - UNREAL_PLAYER_START)[:2] / 100.0
+print("GOAL_POS: ", GOAL_POS)
 
+global_path = np.load("../data/airsim/global_path.npy")
+goal_tolerance = 30  # meters
 
 ## -------------------------- MAIN ------------------------ ##
 if __name__ == "__main__":
@@ -42,12 +45,21 @@ if __name__ == "__main__":
 
     car_controls = airsim.CarControls()
 
+    path_idx = 0
+    goal = global_path[path_idx]
+    current_pose = get_pose2D(client)
+
     # Initialize AutoNav class
-    autonav = AutoNav()
+    autonav = AutoNav(goal)
+
+    # Visualization
+    f, (ax1, ax2) = plt.subplots(1, 2)
+    plt.ion()
+    plt.show()
 
     # Parameters
     throttle = 0.5
-    N_iters = 10
+    N_iters = 100
     idx = 0
 
     # brake the car
@@ -62,24 +74,37 @@ if __name__ == "__main__":
 
     try:
         while idx < N_iters:
+            current_pose = get_pose2D(client)
+            print("current_pose: ", current_pose)
+            if np.linalg.norm(current_pose[:2] - autonav.goal) < goal_tolerance:
+                print("Reached goal!")
+                path_idx += 1
+                if path_idx >= global_path.shape[0]:
+                    print("Reached end of path!")
+                    break
+                goal = global_path[path_idx]
+                autonav.update_goal(goal)
+                print("New goal: ", goal)
+
             # Get image
             png_image = client.simGetImage("BirdsEyeCamera", airsim.ImageType.Scene)
-            print("captured image")
-            decoded = cv.imdecode(np.frombuffer(png_image, np.uint8), -1)
-            # fig = px.imshow(decoded)
-            # fig.show()
-            # # display image in pyplot window
-            # # img = cv.imread(png_image)
-            # plt.imshow(decoded)
-            # plt.show(block=False)
+            img_decoded = cv.imdecode(np.frombuffer(png_image, np.uint8), -1)
+            print(img_decoded.shape)
 
-            autonav.update_costmap(decoded)
-            arc, cost, w = autonav.replan()
+            autonav.update_costmap(img_decoded)
+            arc, cost, w = autonav.replan(current_pose)
 
             car_controls.steering = w / 1.6
             car_controls.throttle = throttle
             client.setCarControls(car_controls)
             print("steering: ", car_controls.steering, "throttle: ", car_controls.throttle)
+
+            # ax2.clear()
+            # ax1.imshow(img_decoded)
+            # ax2.imshow(autonav.costmap, alpha=0.2)
+            # autonav.plot_arcs(ax2)
+            # plt.draw()
+            # plt.pause(.001)
 
             time.sleep(autonav.arc_duration)
             idx += 1

@@ -27,20 +27,30 @@ if __name__ == "__main__":
     # Connect to client
     client = airsim.CarClient()
     client.confirmConnection()
-    client.enableApiControl(True)
 
-    time.sleep(1)
+    time.sleep(0.2)
 
-    png_image = client.simGetImage("FrontCamera", airsim.ImageType.Scene)
-    #png_image = client.simGetImage("BirdsEyeCamera", airsim.ImageType.Scene)
+    mode = 'STEREO'  # 'FRONT', 'BIRDSEYE', 'STEREO'
+    path = 'C:/Users/Adam/NAVLAB/NeRF/terrain-nerf/data/airsim/images/'
+    timestamp = str(time.time())
+
+    if mode == 'FRONT':
+        png_image = client.simGetImage("FrontCamera", airsim.ImageType.Scene)
+        filename = 'front_' + str(time.time()) + '.png'
+        airsim.write_file(os.path.normpath(path + filename), png_image)
+
+    elif mode == 'BIRDSEYE':
+        png_image = client.simGetImage("BirdsEyeCamera", airsim.ImageType.Scene)
+        filename = 'birdseye_' + str(time.time()) + '.png'
+        airsim.write_file(os.path.normpath(path + filename), png_image)
+
+    elif mode == 'STEREO':
+        left_image = client.simGetImage("StereoCameraLeft", airsim.ImageType.Scene)
+        right_image = client.simGetImage("StereoCameraRight", airsim.ImageType.Scene)
+        airsim.write_file(os.path.normpath(path + 'left_' + str(time.time()) + '.png'), left_image)
+        airsim.write_file(os.path.normpath(path + 'right_' + str(time.time()) + '.png'), right_image)
+
     print("captured image")
-    # save image
-    airsim.write_file(os.path.normpath('C:/Users/Adam/Documents/AirSim/image.png'), png_image)
-
-
-    # # Restore to original state
-    # client.reset()
-    # client.enableApiControl(False)
 
     
 

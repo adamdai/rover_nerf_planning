@@ -31,7 +31,7 @@ if __name__ == "__main__":
     try:
         while True:
             car_controls.steering = 0.0
-            car_controls.throttle = 0.5
+            car_controls.throttle = 0.66
             client.setCarControls(car_controls)
             
     except KeyboardInterrupt:
