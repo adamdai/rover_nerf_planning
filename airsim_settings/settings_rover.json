@@ -1,0 +1,57 @@
+{
+    "SettingsVersion": 1.2,
+    "SimMode": "Car",
+    "PawnPaths": {
+        "Rover": {"PawnBP": "Class'/AirSim/VehicleAdv/Vehicle/VehicleAdvPawn.VehicleAdvPawn_C'"}
+    },
+    "Vehicles": {
+        "Rover": {
+            "VehicleType": "PhysXCar",
+            "PawnPath": "Rover",
+            "Cameras": {
+                "FrontCamera": {
+                    "CaptureSettings": [
+                        {
+                        "ImageType": 0,
+                        "Width": 1920,
+                        "Height": 1080,
+                        "FOV_Degrees": 90,
+                        "AutoExposureSpeed": 100,
+                        "AutoExposureBias": 0,
+                        "AutoExposureMaxBrightness": 0.64,
+                        "AutoExposureMinBrightness": 0.03,
+                        "MotionBlurAmount": 0,
+                        "TargetGamma": 1.0,
+                        "ProjectionMode": "",
+                        "OrthoWidth": 5.12
+                        }
+                      ],
+                    "X": 0.0, "Y": 0, "Z": -1,
+                    "Pitch": 0, "Roll": 0, "Yaw": 0
+                },
+                "BirdsEyeCamera": {
+                    "CaptureSettings": [
+                        {
+                        "ImageType": 0,
+                        "Width": 800,
+                        "Height": 800,
+                        "FOV_Degrees": 90,
+                        "AutoExposureSpeed": 100,
+                        "AutoExposureBias": 0,
+                        "AutoExposureMaxBrightness": 0.64,
+                        "AutoExposureMinBrightness": 0.03,
+                        "MotionBlurAmount": 0,
+                        "TargetGamma": 1.0,
+                        "ProjectionMode": "",
+                        "OrthoWidth": 5.12
+                        }
+                      ],
+                    "X": 0, "Y": 0, "Z": -10,
+                    "Pitch": -90, "Roll": 0, "Yaw": 0
+                }
+            },
+            "X": 0, "Y": 0, "Z": 0,
+            "Pitch": 0, "Roll": 0, "Yaw": 0
+        }
+    }
+  }
