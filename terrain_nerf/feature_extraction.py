@@ -4,6 +4,8 @@ from tensorflow.keras.applications.vgg16 import VGG16
 from tensorflow.keras.applications.vgg16 import preprocess_input
 from tqdm.notebook import tqdm
 from sklearn.cluster import MiniBatchKMeans
+from skimage.segmentation import slic
+
 
 def extract_and_classify(image_og, square_size=32, batch_size=256):
     # Calculate padding size

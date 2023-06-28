@@ -4,13 +4,13 @@ import os
 import json
 import csv
 import imageio
-from sklearn.metrics import pairwise_distances
+
 
 def get_intrinsic(imgdir):
     imgfiles = [os.path.join(imgdir, f) for f in sorted(os.listdir(imgdir)) if f.endswith('JPG') or f.endswith('jpg') or f.endswith('png') or f.endswith('jpeg')]
 
     H, W, C = imageio.imread(imgfiles[0]).shape
-    vfov = 40
+    vfov = 90
 
     focal_y = H / 2  / np.tan(np.deg2rad(vfov/2))
     focal_x = H / 2  / np.tan(np.deg2rad(vfov/2))
@@ -133,7 +133,7 @@ if __name__ == '__main__':
     SS[1,1] = scale
     SS[2,2] = scale
     
-    rot_ECEF2ENUV = np.array([[0, 0, -1], [1, 0, 0], [0, -1, 0]])
+    rot_ECEF2ENUV = np.array([[0, 0, -1], [1, 0, 0], [0, -1, 0]])  # airsim camera frame transformation
 
     nxyz = []
     frames = []

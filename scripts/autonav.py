@@ -37,6 +37,8 @@ VISUALIZE = False
 global_path = np.load("../data/airsim/global_path.npy")
 goal_tolerance = 30  # meters
 
+global_costmap = None
+
 ## -------------------------- MAIN ------------------------ ##
 if __name__ == "__main__":
 
