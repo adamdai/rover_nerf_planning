@@ -19,6 +19,24 @@ def rgb2gray(rgb):
     return np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140])
 
 
+def pc_plot_trace(P, color=None, size=2):
+    """Generate plotly plot trace for point cloud
+
+    Parameters
+    ----------
+    P : np.array (N x 3)
+        Point cloud
+
+    Returns
+    -------
+    go.Scatter3d
+        Scatter plot trace
+
+    """
+    return go.Scatter3d(x=P[:,0], y=P[:,1], z=P[:,2], 
+        mode='markers', marker=dict(size=size, color=color))
+
+
 def trajectory_plot_trace(Rs, ts, color="red", scale=1.0):
     """Generate plotly plot trace for a 3D trajectory of poses
     TODO: plot xyz arrows as RGB
