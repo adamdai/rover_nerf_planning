@@ -20,10 +20,17 @@ from matplotlib import pyplot as plt
 import cv2 as cv
 import plotly.express as px
 from PIL import Image
+import argparse
 
+from terrain_nerf.airsim_utils import airsim_pose_to_Rt
+
+arg_parser = argparse.ArgumentParser(description="Take an image in airsim")
+arg_parser.add_argument("--mode", type=str, help="image mode (front, birdseye, stereo, depth)")   
+args = arg_parser.parse_args()
 
 ## -------------------------- MAIN ------------------------ ##
 if __name__ == "__main__":
+    # TODO: add arg for mode
 
     # Connect to client
     client = airsim.CarClient()
@@ -31,35 +38,34 @@ if __name__ == "__main__":
 
     time.sleep(0.2)
 
-    mode = 'DEPTH'  # 'FRONT', 'BIRDSEYE', 'STEREO', 'DEPTH'
+    #mode = 'FRONT'  # 'FRONT', 'BIRDSEYE', 'STEREO', 'DEPTH'
+    mode = args.mode
     path = 'C:/Users/Adam/NAVLAB/NeRF/terrain-nerf/data/airsim/images/'
     timestamp = str(time.time())
 
-    if mode == 'FRONT':
+    if mode == 'front':
         png_image = client.simGetImage("FrontCamera", airsim.ImageType.Scene)
         filename = 'front_' + timestamp + '.png'
         airsim.write_file(os.path.normpath(path + filename), png_image)
 
-    elif mode == 'BIRDSEYE':
+    elif mode == 'birdseye':
         png_image = client.simGetImage("BirdsEyeCamera", airsim.ImageType.Scene)
         filename = 'birdseye_' + timestamp + '.png'
         airsim.write_file(os.path.normpath(path + filename), png_image)
 
-    elif mode == 'STEREO':
+    elif mode == 'stereo':
         left_image = client.simGetImage("StereoCameraLeft", airsim.ImageType.Scene)
         right_image = client.simGetImage("StereoCameraRight", airsim.ImageType.Scene)
         airsim.write_file(os.path.normpath(path + 'left_' + timestamp + '.png'), left_image)
         airsim.write_file(os.path.normpath(path + 'right_' + timestamp + '.png'), right_image)
     
-    elif mode == 'DEPTH':
-        # depth_image = client.simGetImage("FrontCamera", airsim.ImageType.DepthPlanar)
-        # img_decoded = cv.imdecode(np.frombuffer(depth_image, np.uint8), -1)
-        # print(np.unique(img_decoded))
-        # depth_vis = client.simGetImage("FrontCamera", airsim.ImageType.DepthVis)
+    elif mode == 'depth':
         responses = client.simGetImages([airsim.ImageRequest("Depth", airsim.ImageType.DepthPlanar, pixels_as_float=True, compress=False),
                                          airsim.ImageRequest("Disparity", airsim.ImageType.DisparityNormalized, pixels_as_float=True, compress=False)])
-        camera_info = client.simGetCameraInfo("FrontCamera")
-        print(camera_info.proj_mat)
+        
+        camera_info = client.simGetCameraInfo("Depth")
+        print(airsim_pose_to_Rt(camera_info.pose))
+
         depth_float = np.array(responses[0].image_data_float)
         depth_float = depth_float.reshape(responses[0].height, responses[0].width)
         print(np.min(depth_float), np.max(depth_float))
@@ -67,8 +73,6 @@ if __name__ == "__main__":
         depth_image = Image.fromarray(depth_float)
         depth_image = depth_image.convert("L")
         depth_image.save(os.path.normpath(path + 'depth_' + timestamp + '.png'))
-        # filename = 'depth_' + str(time.time()) + '.png'
-        # airsim.write_file(os.path.normpath(path + filename), depth_image)
 
     print("captured image")
 

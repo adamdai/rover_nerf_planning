@@ -5,6 +5,7 @@ General utilities
 
 import numpy as np
 import plotly.graph_objects as go
+from scipy.spatial.transform import Rotation as R
 
 
 def wrap_angle(a):
@@ -17,6 +18,46 @@ def wrap_angle(a):
 
 def rgb2gray(rgb):
     return np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140])
+
+
+def quat_to_R(quat):
+    """Convert quaternion to 3D rotation matrix 
+
+    Parameters
+    ----------
+    quat : np.array (1 x 4)
+        Quaternion in scalar-last (x, y, z, w) format
+
+    Returns
+    -------
+    np.array (3 x 3)
+        Rotation matrix
+
+    """
+    r = R.from_quat(quat)
+    return r.as_matrix()
+
+
+def euler_to_R(roll, pitch, yaw):
+    """Convert Euler angles to 3D rotation matrix
+
+    Parameters
+    ----------
+    roll : float
+        Roll angle (radians)
+    pitch : float
+        Pitch angle (radians)
+    yaw : float
+        Yaw angle (radians)
+
+    Returns
+    -------
+    np.array (3 x 3)
+        Rotation matrix
+
+    """
+    r = R.from_euler('xyz', [roll, pitch, yaw])
+    return r.as_matrix()
 
 
 def pc_plot_trace(P, color=None, size=2):
