@@ -22,22 +22,22 @@ import plotly.express as px
 
 from terrain_nerf.autonav import AutoNav
 from terrain_nerf.airsim_utils import get_pose2D
+from terrain_nerf.global_planner import GlobalPlanner
 
 ## -------------------------- PARAMS ------------------------ ##
 # Unreal environment
 # (in unreal units, 100 unreal units = 1 meter)
 UNREAL_PLAYER_START = np.array([-117252.054688, 264463.03125, 25148.908203])
-UNREAL_GOAL = np.array([210111.421875, 111218.84375, 32213.0])
+UNREAL_GOAL = np.array([-83250.0, 258070.0, 24860.0])
 
 GOAL_POS = (UNREAL_GOAL - UNREAL_PLAYER_START)[:2] / 100.0
 print("GOAL_POS: ", GOAL_POS)
 
 VISUALIZE = False
 
-global_path = np.load("../data/airsim/global_path.npy")
-goal_tolerance = 30  # meters
-
-global_costmap = None
+global_img = cv.imread('../data/airsim/images/test_scenario.png')
+#global_planner = GlobalPlanner()
+goal = GOAL_POS
 
 ## -------------------------- MAIN ------------------------ ##
 if __name__ == "__main__":
@@ -50,7 +50,6 @@ if __name__ == "__main__":
     car_controls = airsim.CarControls()
 
     path_idx = 0
-    goal = global_path[path_idx]
     current_pose = get_pose2D(client)
 
     # Initialize AutoNav class
@@ -67,7 +66,7 @@ if __name__ == "__main__":
 
     # Parameters
     throttle = 0.5
-    N_iters = 100000000000000
+    N_iters = 1e5
     idx = 0
 
     # brake the car
@@ -86,15 +85,9 @@ if __name__ == "__main__":
             current_pose = get_pose2D(client)
             print("current_pose: ", current_pose)
             print("goal: ", goal)
-            if np.linalg.norm(current_pose[:2] - autonav.goal) < goal_tolerance:
+            if np.linalg.norm(current_pose[:2] - autonav.goal) < 10:
                 print("Reached goal!")
-                path_idx += 1
-                if path_idx >= global_path.shape[0]:
-                    print("Reached end of path!")
-                    break
-                goal = global_path[path_idx]
-                autonav.update_goal(goal)
-                print("New goal: ", goal)
+                break
 
             # Get image
             png_image = client.simGetImage("BirdsEyeCamera", airsim.ImageType.Scene)

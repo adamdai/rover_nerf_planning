@@ -64,11 +64,9 @@ if __name__ == "__main__":
                                          airsim.ImageRequest("Disparity", airsim.ImageType.DisparityNormalized, pixels_as_float=True, compress=False)])
         
         camera_info = client.simGetCameraInfo("Depth")
-        print(airsim_pose_to_Rt(camera_info.pose))
 
         depth_float = np.array(responses[0].image_data_float)
         depth_float = depth_float.reshape(responses[0].height, responses[0].width)
-        print(np.min(depth_float), np.max(depth_float))
         np.save(os.path.normpath(path + 'depth_' + timestamp + '.npy'), depth_float)
         depth_image = Image.fromarray(depth_float)
         depth_image = depth_image.convert("L")

@@ -39,4 +39,4 @@ def airsim_pose_to_Rt(pose):
     z = pose.position.z_val
     q = np.array([pose.orientation.x_val, pose.orientation.y_val, pose.orientation.z_val, pose.orientation.w_val])
     R = quat_to_R(q)
-    return R, np.array([x, y, z])
+    return np.hstack((R, np.array([x, y, z])[:,None]))

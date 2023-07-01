@@ -3,7 +3,9 @@
 """
 
 import numpy as np
+import cv2 as cv
 
+from terrain_nerf.utils import rgb2gray
 
 
 def px_to_global(depth, cam_pose, cam_params, px):
@@ -45,11 +47,13 @@ def depth_to_global(depth, cam_pose, cam_params, depth_thresh=50.0, patch_size=2
     D = D[D < depth_thresh]
 
     G = np.zeros((D.shape[0], 5))
-    G[:,0] = D
-    G[:,1] = (J - cam_params['cx']) * D / cam_params['fx']
-    G[:,2] = (I - cam_params['cy']) * D / cam_params['fy']
+    G[:,0] = D                                                # x
+    G[:,1] = (J - cam_params['cx']) * D / cam_params['fx']    # y
+    G[:,2] = -(I - cam_params['cy']) * D / cam_params['fy']   # z
     G[:,3] = I
     G[:,4] = J
+
+    #G[:,0:3] = np.dot(cam_pose[:3,:3], G[:,0:3].T).T + cam_pose[:3,3]
     return G
 
 
@@ -88,6 +92,16 @@ class FeatureMap:
         y = self.scale * (img_x - self.start_px[0])
         x = self.scale * (img_y - self.start_px[1])
         return x, y
+    
+
+    def global_to_img(self, x, y):
+        """Convert global coordinates to image coordinates
+
+        """
+        img_x = int(y / self.scale) + self.start_px[0]
+        img_y = int(x / self.scale) + self.start_px[1]
+        return img_x, img_y
+    
 
     def get_img_feature(self, x, y):
         """Get image feature for global coordinates (x,y)
@@ -98,3 +112,57 @@ class FeatureMap:
         return self.img[img_x, img_y, :]
     
 
+    def cluster(self, k=3):
+        """Cluster based on image
+
+        """
+        img = cv.cvtColor(self.img, cv.COLOR_BGR2RGB)
+        pixel_values = img.reshape((-1, 3))
+        pixel_values = np.float32(pixel_values)
+
+        norm = 20.0
+        X, Y = np.meshgrid(np.linspace(0, self.width/norm, self.width), np.linspace(0, self.height/norm, self.height))
+        values = np.float32(np.hstack((pixel_values, X.reshape((-1,1)), Y.reshape((-1,1)))))
+
+        # Cluster global img with k-means
+        criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 100, 0.2)
+        _, labels, (centers) = cv.kmeans(values, k, None, criteria, 10, cv.KMEANS_RANDOM_CENTERS)
+        centers = np.uint8(centers[:,0:3])
+
+        self.labels = labels.reshape((img.shape[0], img.shape[1]))
+        self.num_clusters = k
+        labels = labels.flatten()
+        segmented_image = centers[labels.flatten()]
+        # reshape back to the original image dimension
+        self.segmented_image = segmented_image.reshape(img.shape)
+
+
+    def init_costmap(self):
+        """Generate costmap from image
+
+        TODO: use image gradients
+
+        """
+        img_gray = rgb2gray(self.segmented_image)
+        img_gray = img_gray / np.max(img_gray)
+        cost = 1.0 - img_gray
+        return cost
+    
+
+    def update_costmap(self, image, depth):
+        """Update costmap from rover image
+
+        """
+        pass
+
+
+
+class CostMap:
+    def __init__(self, mat, clusters, vals):
+        self.clusters = clusters
+        self.vals = vals
+        self.num_clusters = len(vals)
+        self.mat = mat
+
+    def __call__(self, x, y):
+        return self.vals[int(self.clusters[x,y])]
