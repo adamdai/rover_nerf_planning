@@ -11,9 +11,14 @@ client.confirmConnection()
 
 dt = 0.1
 states = []
+collision_count = 0
 
 try:
     while True:
+        collision_info = client.simGetCollisionInfo("Rover")  # FIXME: collisions not detected in Moon environment
+        if collision_info.has_collided:
+            collision_count += 1
+            print(f"==> Collision detected! Count = {collision_count}")
         pose = client.simGetVehiclePose()
         car_state = client.getCarState()
         x = car_state.kinematics_estimated.position.x_val
@@ -29,7 +34,7 @@ try:
 except KeyboardInterrupt:
     print("Saving states")
     timestamp = time.strftime("%Y%m%d-%H%M")
-    np.savez(f'../data/airsim/logs/states_{timestamp}.npz', states=states)
+    np.savez(f'../data/airsim/logs/states_{timestamp}.npz', states=states, collision_count=collision_count)
     print("Interrupted by user, shutting down")
     client.enableApiControl(False)
     exit()

@@ -53,9 +53,9 @@ class AutoNavDepth:
         dt = 0.1
         self.arc_duration = arc_duration  # seconds
         self.N = int(self.arc_duration / dt)
-        N_arcs = 11
-        speed = 2.5  # m/s
-        max_omega = 0.25  # rad/s
+        N_arcs = 15
+        speed = 1.6  # m/s
+        max_omega = 0.3  # rad/s
         self.omegas = np.linspace(-max_omega, max_omega, N_arcs)
         self.candidate_arcs = [arc(np.zeros(3), [speed, w], self.N, dt) for w in self.omegas]
 
@@ -101,7 +101,7 @@ class AutoNavDepth:
             else:
                 bins[(x_idx, y_idx)].append(z)
 
-        cost_vals = []
+        cost_vals = []                           # TODO: use a longer max_depth for cost_vals 
         for k, v in bins.items():
             cost = 100 * np.var(v)
             self.costmap[k] = cost

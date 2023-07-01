@@ -37,12 +37,13 @@ GOAL_POS = (UNREAL_GOAL - UNREAL_PLAYER_START)[:2] / 100.0
 print("GOAL_POS: ", GOAL_POS)
 
 VISUALIZE = True
+REPLAN = True
 
 ## -------------------------- SETUP ------------------------ ##
-global_img = cv.imread('../data/airsim/images/test_scenario_2.png')
+global_img = cv.imread('../data/airsim/images/test_scenario_3.png')
 global_img = global_img[::2, ::2, :]
-start_px = (148, 157)
-goal_px = (77, 535)
+start_px = (138, 141)
+goal_px = (78, 493)
 
 costmap_data = np.load('../data/airsim/costmap.npz')
 costmap = CostMap(costmap_data['mat'], costmap_data['clusters'], costmap_data['vals'])
@@ -50,7 +51,10 @@ costmap = CostMap(costmap_data['mat'], costmap_data['clusters'], costmap_data['v
 feat_map = FeatureMap(global_img, start_px, goal_px, UNREAL_PLAYER_START, UNREAL_GOAL)
 global_planner = GlobalPlanner(costmap, feat_map, goal_px)
 nav_goal = global_planner.replan(np.zeros(3))[1]
-autonav = AutoNavDepth(nav_goal)
+if REPLAN:
+    autonav = AutoNavDepth(nav_goal)
+else:
+    autonav = AutoNavDepth(GOAL_POS)
 
 ## -------------------------- MAIN ------------------------ ##
 if __name__ == "__main__":
@@ -78,7 +82,7 @@ if __name__ == "__main__":
         #plt.show()
 
     # Parameters
-    throttle = 0.5
+    throttle = 0.4
     N_iters = 1e5
     idx = 0
 
@@ -113,8 +117,13 @@ if __name__ == "__main__":
             image = cv.imdecode(np.frombuffer(image, np.uint8), -1)
 
             cost_vals = autonav.update_costmap(current_pose, depth_float)
-            global_planner.update_costmap(cost_vals)
-            nav_goal = global_planner.replan(current_pose)[1]
+            if REPLAN:
+                global_planner.update_costmap(cost_vals)
+            path = global_planner.replan(current_pose)
+            if len(path) > 1:
+                nav_goal = path[1]
+            else:
+                nav_goal = GOAL_POS
             autonav.update_goal(nav_goal)
             arc, cost, w = autonav.replan(current_pose)
 
@@ -136,8 +145,12 @@ if __name__ == "__main__":
                 ax[0,1].imshow(depth_image)
                 im2 = autonav.plot_costmap(ax[1,0], show_arcs=True)
                 ax[1,0].set_title(f"Local costmap \n Max cost = {np.max(autonav.costmap)}")
+                ax[1,0].set_xlabel("y (m)")
+                ax[1,0].set_ylabel("x (m)")
                 im3 = global_planner.plot(ax[1,1])
                 ax[1,1].set_title(f"Global costmap \n Max cost = {np.max(global_planner.costmap.mat)}")
+                ax[1,1].set_xlabel("x (m)")
+                ax[1,1].set_ylabel("y (m)")
                 #cbar3.set_clim(vmin=0, vmax=np.max(global_planner.costmap))
                 # plt.colorbar(im3, ax=ax[1], fraction=0.05, aspect=10)  # FIXME: makes a new colorbar every time
                 plt.pause(autonav.arc_duration)

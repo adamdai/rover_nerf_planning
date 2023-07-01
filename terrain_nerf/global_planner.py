@@ -52,9 +52,9 @@ class GlobalPlanner(AStar):
 
     def replan(self, cur_pose):
         """Replan"""
-        num_waypts = 4
         x, y = self.feat_map.global_to_img(cur_pose[0], cur_pose[1])
         path = self.plan((x, y), self.goal_px)
+        num_waypts = int(len(path) / 30)
         path = path[np.linspace(0, len(path)-1, num_waypts, dtype=int)]
         path_x, path_y = self.feat_map.img_to_global(path[:,0], path[:,1])
         path = np.vstack((path_x, path_y)).T
