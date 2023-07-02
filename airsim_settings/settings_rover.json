@@ -4,46 +4,69 @@
     "PawnPaths": {
         "Rover": {"PawnBP": "Class'/AirSim/VehicleAdv/Vehicle/VehicleAdvPawn.VehicleAdvPawn_C'"}
     },
+    "CameraDefaults": {
+      "CaptureSettings": [
+        {
+          "ImageType": 1,
+          "Width": 800,
+          "Height": 600
+        },
+        {
+          "ImageType": 2,
+          "Width": 800,
+          "Height": 600
+        },
+        {
+          "ImageType": 3,
+          "Width": 800,
+          "Height": 600
+        }
+      ]
+    },
     "Vehicles": {
         "Rover": {
             "VehicleType": "PhysXCar",
             "PawnPath": "Rover",
             "Cameras": {
                 "FrontCamera": {
-                    "CaptureSettings": [
-                        {
-                        "ImageType": 0,
-                        "Width": 1920,
-                        "Height": 1080,
-                        "FOV_Degrees": 90,
-                        "AutoExposureSpeed": 100,
-                        "AutoExposureBias": 0,
-                        "AutoExposureMaxBrightness": 0.64,
-                        "AutoExposureMinBrightness": 0.03,
-                        "MotionBlurAmount": 0,
-                        "TargetGamma": 1.0,
-                        "ProjectionMode": "",
-                        "OrthoWidth": 5.12
-                        }
-                      ],
-                    "X": 0.0, "Y": 0, "Z": -1,
-                    "Pitch": 0, "Roll": 0, "Yaw": 0
+                  "CaptureSettings": [
+                      {
+                      "ImageType": 0,
+                      "Width": 800,
+                      "Height": 600
+                      }
+                    ],
+                  "X": 0.0, "Y": 0, "Z": -1,
+                  "Pitch": 0, "Roll": 0, "Yaw": 0
+                },
+                "Depth": {
+                  "CaptureSettings": [
+                      {
+                      "ImageType": 1,
+                      "Width": 800,
+                      "Height": 600
+                      }
+                    ],
+                  "X": 0.0, "Y": 0, "Z": -1,
+                  "Pitch": 0, "Roll": 0, "Yaw": 0
+                },
+                "Disparity": {
+                  "CaptureSettings": [
+                      {
+                      "ImageType": 4,
+                      "Width": 800,
+                      "Height": 600
+                      }
+                    ],
+                  "X": 0.0, "Y": 0, "Z": -1,
+                  "Pitch": 0, "Roll": 0, "Yaw": 0
                 },
                 "StereoCameraLeft": {
                   "CaptureSettings": [
                       {
                       "ImageType": 0,
                       "Width": 720,
-                      "Height": 480,
-                      "FOV_Degrees": 90,
-                      "AutoExposureSpeed": 100,
-                      "AutoExposureBias": 0,
-                      "AutoExposureMaxBrightness": 0.64,
-                      "AutoExposureMinBrightness": 0.03,
-                      "MotionBlurAmount": 0,
-                      "TargetGamma": 1.0,
-                      "ProjectionMode": "",
-                      "OrthoWidth": 5.12
+                      "Height": 480
                       }
                     ],
                   "X": 0.0, "Y": -0.5, "Z": -1,
@@ -54,16 +77,7 @@
                       {
                       "ImageType": 0,
                       "Width": 720,
-                      "Height": 480,
-                      "FOV_Degrees": 90,
-                      "AutoExposureSpeed": 100,
-                      "AutoExposureBias": 0,
-                      "AutoExposureMaxBrightness": 0.64,
-                      "AutoExposureMinBrightness": 0.03,
-                      "MotionBlurAmount": 0,
-                      "TargetGamma": 1.0,
-                      "ProjectionMode": "",
-                      "OrthoWidth": 5.12
+                      "Height": 480
                       }
                     ],
                   "X": 0.0, "Y": 0.5, "Z": -1,
@@ -80,10 +94,7 @@
                         "AutoExposureBias": 0,
                         "AutoExposureMaxBrightness": 0.9,
                         "AutoExposureMinBrightness": 0.1,
-                        "MotionBlurAmount": 0,
-                        "TargetGamma": 1.5,
-                        "ProjectionMode": "",
-                        "OrthoWidth": 5.12
+                        "TargetGamma": 1.5
                         }
                       ],
                     "X": 0, "Y": 0, "Z": -20,
