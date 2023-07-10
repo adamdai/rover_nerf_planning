@@ -4,13 +4,13 @@ import os
 import json
 import csv
 import imageio
-
+from sklearn.metrics import pairwise_distances
 
 def get_intrinsic(imgdir):
     imgfiles = [os.path.join(imgdir, f) for f in sorted(os.listdir(imgdir)) if f.endswith('JPG') or f.endswith('jpg') or f.endswith('png') or f.endswith('jpeg')]
 
     H, W, C = imageio.imread(imgfiles[0]).shape
-    vfov = 90
+    vfov = 40
 
     focal_y = H / 2  / np.tan(np.deg2rad(vfov/2))
     focal_x = H / 2  / np.tan(np.deg2rad(vfov/2))
@@ -63,6 +63,27 @@ def quaternion_to_euler(q_w, q_x, q_y, q_z):
 
     return roll, pitch, yaw
 
+def qvec2rotmat(qvec):
+    return np.array(
+        [
+            [
+                1 - 2 * qvec[2] ** 2 - 2 * qvec[3] ** 2,
+                2 * qvec[1] * qvec[2] - 2 * qvec[0] * qvec[3],
+                2 * qvec[3] * qvec[1] + 2 * qvec[0] * qvec[2],
+            ],
+            [
+                2 * qvec[1] * qvec[2] + 2 * qvec[0] * qvec[3],
+                1 - 2 * qvec[1] ** 2 - 2 * qvec[3] ** 2,
+                2 * qvec[2] * qvec[3] - 2 * qvec[0] * qvec[1],
+            ],
+            [
+                2 * qvec[3] * qvec[1] - 2 * qvec[0] * qvec[2],
+                2 * qvec[2] * qvec[3] + 2 * qvec[0] * qvec[1],
+                1 - 2 * qvec[1] ** 2 - 2 * qvec[2] ** 2,
+            ],
+        ]
+    )
+
 def config_parser():
     import configargparse
     parser = configargparse.ArgumentParser()
@@ -109,7 +130,8 @@ if __name__ == '__main__':
                 'rotation': {
                     'x': roll,
                     'y': pitch,
-                    'z': yaw
+                    'z': yaw,
+                    'qvec': [q_w, q_x, q_y, q_z]
                 },
                 'image': image_file
                 ,
@@ -126,15 +148,6 @@ if __name__ == '__main__':
 
     H, W, focal_x, focal_y = get_intrinsic(os.path.join(args.datadir, args.imgdir))
 
-    # rescale the whole range if you want
-    scale = 2**3 * np.pi / max(GES_pos.max(), -GES_pos.min())
-    SS = np.eye(4)
-    SS[0,0] = scale
-    SS[1,1] = scale
-    SS[2,2] = scale
-    
-    rot_ECEF2ENUV = np.array([[0, 0, -1], [1, 0, 0], [0, -1, 0]])  # airsim camera frame transformation
-
     nxyz = []
     frames = []
     
@@ -145,29 +158,40 @@ if __name__ == '__main__':
     print("Found entries...", len(data['cameraFrames']))
     for i in range(len(data['cameraFrames'])):
         position = data['cameraFrames'][i]['position']
-        pos_x = position['x'] / 50
-        pos_y = position['y'] / 50
-        pos_z = position['z'] / 50
+        pos_x = position['x']
+        pos_y = position['y']
+        pos_z = position['z']
         xyz = np.array([pos_x, pos_y, pos_z])
-        # [pos_e,pos_n,pos_u] = np.dot(rot_ECEF2ENUV, xyz)
-        [pos_e,pos_n,pos_u] = xyz
+        #print(xyz)
+        
+        rotation = qvec2rotmat(data['cameraFrames'][i]['rotation']['qvec'])
+        # Rotate rotation matrix 
+        airsim_transform = np.array([[1, 0, 0], 
+                                     [0, 0, 1], 
+                                     [0, -1, 0]])
+        #rotation = airsim_transform @ rotation
 
-        rotation = data['cameraFrames'][i]['rotation']
+        translation = xyz.reshape(3, 1)
 
-        x = np.radians(rotation['x'])
-        y = np.radians(rotation['y'])
-        z = np.radians(rotation['z'])
+        
+        w2c = np.concatenate([rotation, translation], 1)
+        w2c = np.concatenate([w2c, np.array([[0, 0, 0, 1]])], 0)
+        c2w = np.linalg.inv(w2c)
+        # Convert from COLMAP's camera coordinate system (OpenCV) to ours (OpenGL)
+        # c2w[0:3, 1:3] *= -1
+        # c2w = c2w[np.array([1, 0, 2, 3]), :]
+        # c2w[2, :] *= -1
 
-        rot_mat = np.linalg.inv(eulerAnglesToRotationMatrix([x, y, z]))
-        rot_mat = np.dot(rot_ECEF2ENUV, rot_mat)
-        GES_rotmat = pad_rot(rot_mat)
+        # c2w[1, :], c2w[2, :] = c2w[2, :], c2w[1, :].copy()
+        # c2w[0, :] = -c2w[0, :]
+        # c2w[2, :] = -c2w[2, :]
+        # c2w[1, :] = -c2w[1, :]
 
-        xyz  = np.array([pos_e,pos_n,pos_u,1])[None,:]
-        nx,ny,nz = np.dot(SS, xyz.T)[:3,0]
-        nxyz.append([nx,ny,nz])
-        GES_rotmat[:3,3] = np.array([nx,ny,nz])
+        c2w[:3,:3] = airsim_transform @ c2w[:3,:3]
+        c2w[2,3] = 1.0
+        print(c2w[:3, 3])
 
-        c2w = np.concatenate([GES_rotmat[:3,:4], np.array([[0, 0, 0, 1]])], 0)
+        nxyz.append(c2w[:3, :3].dot(np.array([0, 0, 1])))
         
         if not os.path.exists(os.path.join(args.datadir, args.imgdir, data['cameraFrames'][i]['image'])):
             print("Image not found", os.path.join(args.imgdir, data['cameraFrames'][i]['image']))
@@ -198,7 +222,6 @@ if __name__ == '__main__':
     out["k2"] = 0.0
     out["p1"] = 0.0
     out["p2"] = 0.0
-    out["scale"] = scale
         
     out["frames"] = frames
     # applied_transform = np.eye(4)[:3, :]
@@ -207,4 +230,3 @@ if __name__ == '__main__':
     print("Saving...", os.path.join(args.datadir, 'transforms.json'))
     with open(os.path.join(args.datadir, 'transforms.json'), 'w', encoding="utf-8") as f: 
         json.dump(out, f, indent=4)
-    

@@ -22,7 +22,7 @@ import cv2 as cv
 from PIL import Image
 import plotly.express as px
 
-from terrain_nerf.autonav_depth import AutoNavDepth
+from terrain_nerf.autonav import AutoNav
 from terrain_nerf.airsim_utils import get_pose2D, airsim_pose_to_Rt
 from terrain_nerf.feature_map import FeatureMap, CostMap
 from terrain_nerf.global_planner import GlobalPlanner
@@ -52,9 +52,9 @@ feat_map = FeatureMap(global_img, start_px, goal_px, UNREAL_PLAYER_START, UNREAL
 global_planner = GlobalPlanner(costmap, feat_map, goal_px)
 nav_goal = global_planner.replan(np.zeros(3))[1]
 if REPLAN:
-    autonav = AutoNavDepth(nav_goal)
+    autonav = AutoNav(nav_goal)
 else:
-    autonav = AutoNavDepth(GOAL_POS)
+    autonav = AutoNav(GOAL_POS)
 
 ## -------------------------- MAIN ------------------------ ##
 if __name__ == "__main__":
