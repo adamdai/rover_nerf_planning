@@ -6,20 +6,20 @@ Neural Radiance Field (NeRF) based path planning for planetary rovers.
 
 Clone the GitHub repository:
 
-    git clone https://github.com/adamdai/chimera_fgo.git
+    git clone https://github.com/adamdai/rover-nerf-planning.git
 
 Create conda environment:
 
-    conda create -n chimera python=3.9
+    conda create -n rover_nerf python=3.8
 
 Active the environment:
    
-    conda activate chimera
+    conda activate rover_nerf
     
 Install dependencies:
 
     pip install -r requirements.txt
    
-Install `chimera` locally from directory containing `setup.py`
+Install `rover_nerf` locally from directory containing `setup.py`
    
     pip install -e .
