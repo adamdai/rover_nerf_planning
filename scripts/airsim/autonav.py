@@ -40,12 +40,12 @@ VISUALIZE = True
 REPLAN = True
 
 ## -------------------------- SETUP ------------------------ ##
-global_img = cv.imread('../data/airsim/images/test_scenario_3.png')
+global_img = cv.imread('../../data/airsim/images/test_scenario_3.png')
 global_img = global_img[::2, ::2, :]
 start_px = (138, 141)
 goal_px = (78, 493)
 
-costmap_data = np.load('../data/airsim/costmap.npz')
+costmap_data = np.load('../../data/airsim/costmap.npz')
 costmap = CostMap(costmap_data['mat'], costmap_data['clusters'], costmap_data['vals'])
 
 feat_map = FeatureMap(global_img, start_px, goal_px, UNREAL_PLAYER_START, UNREAL_GOAL)
