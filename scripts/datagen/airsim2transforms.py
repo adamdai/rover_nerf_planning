@@ -38,7 +38,7 @@ def get_intrinsic(imgdir):
     imgfiles = [os.path.join(imgdir, f) for f in sorted(os.listdir(imgdir)) if f.endswith('JPG') or f.endswith('jpg') or f.endswith('png') or f.endswith('jpeg')]
 
     H, W, C = imageio.imread(imgfiles[0]).shape
-    vfov = 40
+    vfov = 90
 
     focal_y = H / 2  / np.tan(np.deg2rad(vfov/2))
     focal_x = H / 2  / np.tan(np.deg2rad(vfov/2))
@@ -52,6 +52,7 @@ def config_parser():
     parser.add_argument("datadir", type=str, help='path to your meta')
     parser.add_argument("--filename", type=str, default='airsim_rec.txt', help='file name')
     parser.add_argument("--imgdir", type=str, default='images', help='image directory name')
+    parser.add_argument("--ds_rate", type=int, default=1, help='downsample rate')
     
     return parser
     
@@ -64,7 +65,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
  
     data = {}
-    ds_rate = 2
+    ds_rate = args.ds_rate
 
     with open(os.path.join(args.datadir, args.filename), 'r') as file:
         reader = csv.reader(file, delimiter='\t')
@@ -116,7 +117,7 @@ if __name__ == '__main__':
         pos_x = position['x']
         pos_y = position['y']
         pos_z = position['z']
-        xyz = np.array([pos_x, -pos_y, -pos_z])
+        xyz = np.array([pos_x, pos_y, -pos_z])
 
         roll = data['cameraFrames'][i]['rotation']['x']
         pitch = data['cameraFrames'][i]['rotation']['y']
