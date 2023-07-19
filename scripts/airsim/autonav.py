@@ -20,7 +20,6 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import cv2 as cv
 from PIL import Image
-import plotly.express as px
 
 from terrain_nerf.autonav import AutoNav
 from terrain_nerf.airsim_utils import get_pose2D, airsim_pose_to_Rt
@@ -38,6 +37,7 @@ print("GOAL_POS: ", GOAL_POS)
 
 VISUALIZE = True
 REPLAN = True
+RECORD = True
 
 ## -------------------------- SETUP ------------------------ ##
 global_img = cv.imread('../../data/airsim/images/test_scenario_3.png')
@@ -93,7 +93,12 @@ if __name__ == "__main__":
     # wait until car is stopped
     time.sleep(1)
 
+    # release the brake
     car_controls.brake = 0
+
+    # start recording data
+    if RECORD:
+        client.startRecording()
 
     try:
         while idx < N_iters:
@@ -159,11 +164,14 @@ if __name__ == "__main__":
             idx += 1
     
     except KeyboardInterrupt:
+        if RECORD:
+            client.stopRecording()
         # Restore to original state
         client.reset()
         client.enableApiControl(False)
 
-
+    if RECORD:
+        client.stopRecording()
     # Restore to original state
     client.reset()
     client.enableApiControl(False)
