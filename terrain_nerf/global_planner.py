@@ -3,6 +3,8 @@
 """
 
 import numpy as np
+from scipy.interpolate import RBFInterpolator
+from scipy.linalg import LinAlgError
 
 from terrain_nerf.astar import AStar
 
@@ -24,6 +26,10 @@ class GlobalPlanner(AStar):
         self.path = None
         self.goal_px = tuple(goal)     # goal in pixel coordinates
         self.goal_tolerance = goal_tolerance
+
+        self.local_samples = costmap.num_clusters * [None]  # local cost observations (x,y,c) for each cluster
+
+        self.max_costval = 0
 
     def neighbors(self, node):
         x, y = node
@@ -79,21 +85,52 @@ class GlobalPlanner(AStar):
         pose : np.array (3,)
             [x, y, theta]
         """
-
-        local_cost_mat = np.zeros_like(self.costmap.mat)
+        # Update local samples
         for x, y, c in cost_vals:
             i, j = self.feat_map.global_to_img(x, y)
-            local_cost_mat[i, j] = c
+            k = int(self.costmap.cluster_labels[i, j])
+            if self.local_samples[k] is None:
+                self.local_samples[k] = []
+            self.local_samples[k].append((x, y, c))
 
-        # For each cluster 
+        # Interpolate for each cluster
         for k in range(self.costmap.num_clusters):
-            cluster_mask = self.costmap.clusters == k
-            mask = cluster_mask * local_cost_mat
-            if np.sum(mask) == 0:
+            if self.local_samples[k] is None or k == 0:
                 continue
-            avg_cost = np.mean(mask[mask > 0])
-            self.costmap.vals[k] = avg_cost
-            self.costmap.mat[cluster_mask] = avg_cost
+            ls = np.array(self.local_samples[k])
+            try:
+                # Averaging
+                avg_cost = np.mean(ls[:,2])
+                self.costmap.mat[self.costmap.cluster_masks[k]] = avg_cost
+
+                # RBF 
+                # interp = RBFInterpolator(ls[:,:2], ls[:,2])
+                # X, Y = self.feat_map.img_to_global(self.costmap.cluster_pts[k][:,0], self.costmap.cluster_pts[k][:,1])
+                # vals = interp(np.stack((X, Y), axis=1))
+                # self.costmap.mat[self.costmap.cluster_masks[k]] = np.abs(vals)
+                print("  Updated cluster ", k)
+            except LinAlgError:
+                print(f"  Cluster {k}: LinAlgError")
+                continue
+
+        # local_cost_mat = np.zeros_like(self.costmap.mat)
+        # for x, y, c in cost_vals:
+        #     i, j = self.feat_map.global_to_img(x, y)
+        #     local_cost_mat[i, j] = c
+
+        # # For each cluster 
+        # for k in range(self.costmap.num_clusters):
+        #     cluster_mask = self.costmap.clusters == k
+        #     mask = cluster_mask * local_cost_mat
+        #     if np.sum(mask) == 0:
+        #         continue
+        #     avg_cost = np.mean(mask[mask > 0])
+        #     self.costmap.vals[k] = avg_cost
+        #     self.costmap.mat[cluster_mask] = avg_cost
+        
+        self.max_costval = max(np.max(self.costmap.mat), self.max_costval)
+        print("  MAX GLOBAL COST: ", self.max_costval)
+        print("  Min GLOBAL COST: ", np.min(self.costmap.mat))
     
 
     def update(self, cur_pose):

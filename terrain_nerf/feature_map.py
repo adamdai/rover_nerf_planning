@@ -158,11 +158,31 @@ class FeatureMap:
 
 
 class CostMap:
-    def __init__(self, mat, clusters, vals):
-        self.clusters = clusters
-        self.vals = vals
-        self.num_clusters = len(vals)
+    """Global costmap class
+
+    Assumes fixed clusters.
+
+    Attributes
+    ----------
+    mat : np.array (N x M)
+        Costmap matrix
+    cluster_labels : np.array (N x M)
+        Cluster labels for each pixel
+    num_clusters : int
+        Number of clusters
+    cluster_pts : list of np.array
+        List of points for each cluster
+
+    """
+    def __init__(self, mat, cluster_labels, cluster_masks):
+        self.cluster_labels = cluster_labels.astype(int)
+        self.num_clusters = len(cluster_masks)
+        self.cluster_masks = cluster_masks
         self.mat = mat
 
-    def __call__(self, x, y):
-        return self.vals[int(self.clusters[x,y])]
+        self.cluster_pts = []
+        for i in range(self.num_clusters):
+            self.cluster_pts.append(np.array(np.where(self.cluster_labels == i)).T)
+
+    # def __call__(self, x, y):
+    #     return self.vals[int(self.clusters[x,y])]

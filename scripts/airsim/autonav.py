@@ -35,18 +35,23 @@ UNREAL_GOAL = np.array([-83250.0, 258070.0, 24860.0])
 GOAL_POS = (UNREAL_GOAL - UNREAL_PLAYER_START)[:2] / 100.0
 print("GOAL_POS: ", GOAL_POS)
 
+PLAN_TIME = 1.5  # seconds
+THROTTLE = 0.4
+MAX_ITERS = 1e5
+GOAL_TOLERANCE = 20  # meters
+
 VISUALIZE = True
 REPLAN = True
 RECORD = True
 
 ## -------------------------- SETUP ------------------------ ##
-global_img = cv.imread('../../data/airsim/images/test_scenario_3.png')
-global_img = global_img[::2, ::2, :]
+global_img = cv.imread('../../data/airsim/images/test_scenario.png')
+global_img = global_img[::2, ::2, :]  # downscale
 start_px = (138, 141)
 goal_px = (78, 493)
 
 costmap_data = np.load('../../data/airsim/costmap.npz')
-costmap = CostMap(costmap_data['mat'], costmap_data['clusters'], costmap_data['vals'])
+costmap = CostMap(costmap_data['mat'], costmap_data['cluster_labels'], costmap_data['cluster_masks'])
 
 feat_map = FeatureMap(global_img, start_px, goal_px, UNREAL_PLAYER_START, UNREAL_GOAL)
 global_planner = GlobalPlanner(costmap, feat_map, goal_px)
@@ -75,15 +80,15 @@ if __name__ == "__main__":
         # Set figure size
         f.set_figwidth(16)
         f.set_figheight(9)
+        f.set_facecolor('gray')
         ax[0,0].set_title("RGB Image")
         ax[0,1].set_title("Depth Image")
         im3 = global_planner.plot(ax[1,1])
         plt.ion()
-        #plt.show()
+        plt.show()
 
-    # Parameters
-    throttle = 0.4
-    N_iters = 1e5
+    input("Press Enter to start...")
+
     idx = 0
 
     # brake the car
@@ -101,13 +106,13 @@ if __name__ == "__main__":
         client.startRecording()
 
     try:
-        while idx < N_iters:
+        while idx < MAX_ITERS:
             start_time = time.time()
             current_pose = get_pose2D(client)
             print("idx = ", idx)
-            print(" current_pose: ", current_pose)
-            print(" nav_goal: ", nav_goal)
-            if np.linalg.norm(current_pose[:2] - GOAL_POS) < 10:
+            print("  current_pose: ", current_pose)
+            print("  nav_goal: ", nav_goal)
+            if np.linalg.norm(current_pose[:2] - GOAL_POS) < GOAL_TOLERANCE:
                 print("Reached goal!")
                 break
 
@@ -133,10 +138,13 @@ if __name__ == "__main__":
             arc, cost, w = autonav.replan(current_pose)
 
             car_controls.steering = w / 1.6
-            car_controls.throttle = throttle
+            car_controls.throttle = THROTTLE
             client.setCarControls(car_controls)
             #print("steering: ", car_controls.steering, "throttle: ", car_controls.throttle)
-            print(" planning time: ", time.time() - start_time)
+            plan_time = time.time() - start_time
+            print("  planning time: ", plan_time)
+            if plan_time < PLAN_TIME:
+                time.sleep(PLAN_TIME - plan_time)
             print("--------------------------------------------------------------------------------")
 
             if VISUALIZE:
@@ -145,9 +153,10 @@ if __name__ == "__main__":
                 ax[0,0].set_title("RGB Image")
                 ax[0,1].set_title("Depth Image")
                 ax[0,0].imshow(image)
-                depth_image = Image.fromarray(depth_float)
-                depth_image = depth_image.convert("L")
-                ax[0,1].imshow(depth_image)
+                # depth_image = Image.fromarray(depth_float)
+                # depth_image = depth_image.convert("L")
+                # ax[0,1].imshow(depth_image)
+                ax[0,1].imshow(depth_float)
                 im2 = autonav.plot_costmap(ax[1,0], show_arcs=True)
                 ax[1,0].set_title(f"Local costmap \n Max cost = {np.max(autonav.costmap)}")
                 ax[1,0].set_xlabel("y (m)")
@@ -158,9 +167,9 @@ if __name__ == "__main__":
                 ax[1,1].set_ylabel("y (m)")
                 #cbar3.set_clim(vmin=0, vmax=np.max(global_planner.costmap))
                 # plt.colorbar(im3, ax=ax[1], fraction=0.05, aspect=10)  # FIXME: makes a new colorbar every time
-                plt.pause(autonav.arc_duration)
+                plt.pause(autonav.arc_duration - PLAN_TIME)
             else:
-                time.sleep(autonav.arc_duration)
+                time.sleep(autonav.arc_duration - PLAN_TIME)
             idx += 1
     
     except KeyboardInterrupt:

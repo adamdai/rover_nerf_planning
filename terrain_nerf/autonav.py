@@ -54,20 +54,22 @@ class AutoNav:
         self.arc_duration = arc_duration  # seconds
         self.N = int(self.arc_duration / dt)
         N_arcs = 15
-        speed = 1.6  # m/s
+        speed = 3.5  # m/s
         max_omega = 0.3  # rad/s
         self.omegas = np.linspace(-max_omega, max_omega, N_arcs)
         self.candidate_arcs = [arc(np.zeros(3), [speed, w], self.N, dt) for w in self.omegas]
 
         # Costmap
-        self.cmap_resolution = 1  # m
-        self.max_depth = 20  # m
-        self.cmap_dims = [self.max_depth+1, 2*self.max_depth+1]  # m
-        self.cmap_center = [self.max_depth, self.max_depth]
+        self.cmap_resolution = 2  # m
+        self.max_depth = 40  # m
+        W = int(self.max_depth / self.cmap_resolution)
+        self.cmap_dims = [W + 1, 2*W + 1]  # m
+        self.cmap_center = [W, W]
         self.costmap = np.zeros(self.cmap_dims) 
 
         self.goal = goal
         self.opt_idx = None
+        self.max_costval = 0
 
         self.cam_params = {'w': 800,
               'h': 600,
@@ -103,13 +105,16 @@ class AutoNav:
 
         cost_vals = []                           # TODO: use a longer max_depth for cost_vals 
         for k, v in bins.items():
-            cost = 100 * np.var(v)
+            cost = 500 * np.var(v)
             self.costmap[k] = cost
+            self.max_costval = max(self.max_costval, cost)
             local_x = self.cmap_center[0] - k[0]
             local_y = k[1] - self.cmap_center[1]
             global_x = local_x * np.cos(pose[2]) - local_y * np.sin(pose[2]) + pose[0]
             global_y = local_x * np.sin(pose[2]) + local_y * np.cos(pose[2]) + pose[1]
-            cost_vals.append([global_x, global_y, 10 * cost])
+            cost_vals.append([global_x, global_y, cost])
+
+        print("  MAX LOCAL COST: ", self.max_costval)
         return cost_vals
         
 
@@ -161,8 +166,9 @@ class AutoNav:
         """
         """
         im = ax.imshow(self.costmap, alpha=0.5, cmap='viridis_r',
-                       extent=[-self.cmap_dims[1]/2, self.cmap_dims[1]/2,
-                               0, self.max_depth])
+                       extent=[-self.max_depth, self.max_depth,
+                               0, self.max_depth],
+                       vmin=0, vmax=50)
         ax.set_xlabel('y (m)')
         ax.set_ylabel('x (m)')
         if show_arcs:
@@ -171,5 +177,8 @@ class AutoNav:
                 if i == self.opt_idx:
                     ax.plot(arc[:,1], arc[:,0], 'r')
                 else:
-                    ax.plot(arc[:,1], arc[:,0], 'b')
+                    ax.plot(arc[:,1], arc[:,0], 'b--', alpha=0.5, linewidth=1.0)
+        ax.set_xticks(np.arange(-40, 40, 5))
+        ax.set_yticks(np.arange(0, 40, 5))
+        ax.grid(color='gray', linestyle='--', linewidth=0.5)
         return im
