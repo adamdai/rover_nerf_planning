@@ -20,6 +20,8 @@ def rgb2gray(rgb):
     return np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140])
 
 
+### ---------------- Geometry ---------------- ###
+
 def quat_to_R(quat):
     """Convert quaternion to 3D rotation matrix 
 
@@ -59,6 +61,90 @@ def euler_to_R(roll, pitch, yaw):
     r = R.from_euler('xyz', [roll, pitch, yaw])
     return r.as_matrix()
 
+
+def sample_from_ball(N, radius=1.0):
+    """
+    Generates random points uniformly distributed within a ball.
+
+    Parameters:
+        N (int): The number of points to generate.
+        radius (float): The radius of the ball.
+
+    Returns:
+        points (ndarray): An array of shape (n, 3) containing the generated points.
+    """
+    points = np.empty((N, 3))
+
+    for i in range(N):
+        # Generate random spherical coordinates
+        u = np.random.uniform()
+        v = np.random.uniform()
+        theta = 2 * np.pi * u
+        phi = np.arccos(2 * v - 1)
+        r = radius * np.cbrt(np.random.uniform())
+
+        # Convert spherical coordinates to Cartesian coordinates
+        x = r * np.sin(phi) * np.cos(theta)
+        y = r * np.sin(phi) * np.sin(theta)
+        z = r * np.cos(phi)
+
+        points[i] = [x, y, z]
+
+    return points
+
+
+def sample_from_ball_2d(N, radius=1.0):
+    """
+    Generates random points uniformly distributed within a 2D ball.
+
+    Parameters:
+        N (int): The number of points to generate.
+        radius (float): The radius of the ball.
+
+    Returns:
+        points (ndarray): An array of shape (n, 2) containing the generated points.
+    """
+    points = np.empty((N, 2))
+
+    for i in range(N):
+        # Generate random Cartesian coordinates within the circle
+        x = np.random.uniform(-radius, radius)
+        y_range = np.sqrt(radius**2 - x**2)
+        y = np.random.uniform(-y_range, y_range)
+
+        points[i] = [x, y]
+
+    return points
+
+
+
+
+def sample_from_sphere(N, radius=1.0):
+    """Fibonnaci sphere sampling
+    
+    Parameters
+    ----------
+    N : int
+        Number of samples
+    radius : float
+        Radius of sphere
+    
+    """
+    points = []
+    offset = 2.0/N
+    increment = np.pi * (3.0 - np.sqrt(5.0))
+    for i in range(N):
+        y = ((i * offset) - 1) + (offset / 2)
+        r = np.sqrt(1 - pow(y,2))
+        phi = ((i + 1) % N) * increment
+        x = np.cos(phi) * r
+        z = np.sin(phi) * r
+        points.append(radius*np.array([x,y,z]))
+    return np.array(points)
+
+
+
+### ---------------- Plotting ---------------- ###
 
 def pc_plot_trace(P, color=None, size=2):
     """Generate plotly plot trace for point cloud
