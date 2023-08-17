@@ -6,9 +6,9 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='terrain_nerf',
+    name='nerfnav',
     version='1.0',
-    description='Terrain NeRF for Path Planning',
+    description='Neural Radiance Field (NeRF) based path planning for planetary rovers',
     author='Adam Dai',
     author_email='adamdai97@gmail.com',
     url='https://github.com/adamdai/terrain-nerf',
