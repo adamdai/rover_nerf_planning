@@ -1,6 +1,6 @@
 # python=3.9.17
 
-numpy==1.23.5
+numpy
 scipy 
 matplotlib
 jupyter

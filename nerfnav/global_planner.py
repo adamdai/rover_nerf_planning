@@ -6,7 +6,7 @@ import numpy as np
 from scipy.interpolate import RBFInterpolator
 from scipy.linalg import LinAlgError
 
-from terrain_nerf.astar import AStar
+from nerfnav.astar import AStar
 
 
 class GlobalPlanner(AStar):

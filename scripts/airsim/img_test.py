@@ -22,7 +22,7 @@ import plotly.express as px
 from PIL import Image
 import argparse
 
-from terrain_nerf.airsim_utils import airsim_pose_to_Rt
+from nerfnav.airsim_utils import airsim_pose_to_Rt
 
 arg_parser = argparse.ArgumentParser(description="Take an image in airsim")
 arg_parser.add_argument("--mode", type=str, help="image mode (front, birdseye, stereo, depth)")   

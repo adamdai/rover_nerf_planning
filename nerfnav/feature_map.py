@@ -5,7 +5,7 @@
 import numpy as np
 import cv2 as cv
 
-from terrain_nerf.utils import rgb2gray
+from nerfnav.utils import rgb2gray
 
 
 def px_to_global(depth, cam_pose, cam_params, px):

@@ -21,10 +21,10 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import cv2 as cv
 from PIL import Image
 
-from terrain_nerf.autonav import AutoNav
-from terrain_nerf.airsim_utils import get_pose2D, airsim_pose_to_Rt
-from terrain_nerf.feature_map import FeatureMap, CostMap
-from terrain_nerf.global_planner import GlobalPlanner
+from nerfnav.autonav import AutoNav
+from nerfnav.airsim_utils import get_pose2D, airsim_pose_to_Rt
+from nerfnav.feature_map import FeatureMap, CostMap
+from nerfnav.global_planner import GlobalPlanner
 
 ## -------------------------- PARAMS ------------------------ ##
 # Unreal environment

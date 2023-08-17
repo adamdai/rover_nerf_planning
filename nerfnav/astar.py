@@ -1,5 +1,15 @@
 # -*- coding: utf-8 -*-
-""" generic A-Star path searching algorithm """
+""" generic A-Star path searching algorithm 
+
+Taken from: https://pypi.org/project/astar/
+
+Other options:
+- https://github.com/AtsushiSakai/PythonRobotics/blob/35f4f61e44ad9c3f8fc6584e3d0d7ab7889bd866/PathPlanning/AStar/a_star.py
+- https://github.com/AtsushiSakai/PythonRobotics/blob/35f4f61e44ad9c3f8fc6584e3d0d7ab7889bd866/PathPlanning/DStar/dstar.py 
+ 
+
+
+"""
 
 from abc import ABC, abstractmethod
 from heapq import heappush, heappop

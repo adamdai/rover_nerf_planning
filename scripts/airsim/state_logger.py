@@ -6,7 +6,7 @@ import numpy as np
 import airsim
 import time
 
-from terrain_nerf.airsim_utils import get_pose2D, get_pose3D
+from nerfnav.airsim_utils import get_pose2D, get_pose3D
 
 client = airsim.CarClient()
 client.confirmConnection()
