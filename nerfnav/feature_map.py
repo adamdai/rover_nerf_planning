@@ -64,7 +64,8 @@ class FeatureMap:
     Given global image, generate feature map for local planning
 
     """
-    def __init__(self, img, start_px, goal_px, start_unreal, goal_unreal):
+    #def __init__(self, img, start_px, goal_px, start_unreal, goal_unreal):
+    def __init__(self, img, start_px, scale):
         """Initialize feature map from global image
 
         Parameters
@@ -76,10 +77,11 @@ class FeatureMap:
         self.height = img.shape[0]
         self.width = img.shape[1]
         self.start_px = start_px
-        self.goal_px = goal_px
+        # self.goal_px = goal_px
 
-        goal_global = (goal_unreal - start_unreal)[:2] / 100.0
-        self.scale = np.abs(goal_global[0] / (start_px[1] - goal_px[1]))  # meters per pixel
+        # goal_global = (goal_unreal - start_unreal)[:2] / 100.0
+        # self.scale = np.abs(goal_global[0] / (start_px[1] - goal_px[1]))  # meters per pixel
+        self.scale = scale
         x_min, y_min = self.img_to_global(0, 0)
         x_max, y_max = self.img_to_global(self.height, self.width)
         self.bounds = [x_min, x_max, y_min, y_max] 
@@ -109,6 +111,18 @@ class FeatureMap:
         """
         img_x = int(y / self.scale) + self.start_px[0]
         img_y = int(x / self.scale) + self.start_px[1]
+        return self.img[img_x, img_y, :]
+    
+
+    def get_features(self, x):
+        """
+
+        x : np.array (N, 2)
+            Global coordinates
+
+        """
+        img_x = np.round(x[:,0] / self.scale).astype(int) + self.start_px[0]
+        img_y = np.round(x[:,1] / self.scale).astype(int) + self.start_px[1]
         return self.img[img_x, img_y, :]
     
 
