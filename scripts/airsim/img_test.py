@@ -38,9 +38,8 @@ if __name__ == "__main__":
 
     time.sleep(0.2)
 
-    #mode = 'FRONT'  # 'FRONT', 'BIRDSEYE', 'STEREO', 'DEPTH'
-    mode = args.mode
-    path = 'C:/Users/Adam/NAVLAB/Neural_Reps/terrain-nerf/data/airsim/images/rover/'
+    mode = args.mode  # 'front', 'birdseye', 'stereo', 'depth'
+    path = 'C:/Users/Adam/NAVLAB/Neural-Implicits/nerfnav/data/airsim/images/rover/'
     timestamp = str(time.time())
 
     if mode == 'front':
@@ -66,9 +65,9 @@ if __name__ == "__main__":
         image_data = image_data.reshape(responses[0].height, responses[0].width, 3)
         airsim.write_png(os.path.normpath(path + 'front_' + timestamp + '.png'), image_data)
 
-        depth_data = np.array(responses[1].image_data_float)
-        depth_data = depth_data.reshape(responses[1].height, responses[1].width)
-        np.save(os.path.normpath(path + 'depth_' + timestamp + '.npy'), depth_data)
+        # depth_data = np.array(responses[1].image_data_float)
+        # depth_data = depth_data.reshape(responses[1].height, responses[1].width)
+        # np.save(os.path.normpath(path + 'depth_' + timestamp + '.npy'), depth_data)
         
         #png_image = client.simGetImage("FrontCamera", airsim.ImageType.Scene, vehicle_name="Rover")
         #Image.frombytes("RGB", (800, 600), png_image).save("test.png")

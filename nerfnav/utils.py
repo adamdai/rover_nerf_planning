@@ -4,6 +4,7 @@ General utilities
 """
 
 import numpy as np
+import math
 import plotly.graph_objects as go
 from scipy.spatial.transform import Rotation as R
 
@@ -141,6 +142,30 @@ def sample_from_sphere(N, radius=1.0):
         z = np.sin(phi) * r
         points.append(radius*np.array([x,y,z]))
     return np.array(points)
+
+
+
+def fibonacci_sphere(samples: int):
+    """
+    Create points uniformly spread out on a sphere. This is _NOT_ random. 
+    
+    Author:  Daniel Neamati
+    """
+    points = []
+    phi = math.pi * (math.sqrt(5.) - 1.)  # golden angle in radians
+
+    for i in range(samples):
+        y_ = 1 - (i / float(samples - 1)) * 2  # y_ goes from 1 to -1
+        radius = math.sqrt(1 - y_ * y_)  # radius at y_
+
+        theta = phi * i  # golden angle increment
+
+        x_ = math.cos(theta) * radius
+        z_ = math.sin(theta) * radius
+
+        points.append((x_, y_, z_))
+
+    return points
 
 
 

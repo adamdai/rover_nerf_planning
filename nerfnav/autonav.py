@@ -7,121 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2 as cv
 
-from nerfnav.utils import wrap_angle
-from nerfnav.feature_map import depth_to_global
-
-
-def arc(x0, u, N, dt):
-    """
-    """
-    def dx(v, w, t, eps=1e-15):
-        return v * np.sin((w + eps) * t) / (w + eps)
-    def dy(v, w, t, eps=1e-15):
-        return v * (1 - np.cos((w + eps) * t)) / (w + eps)
-
-    traj = np.zeros((N, 3))
-    traj[:,0] = [x0[0] + dx(u[0], u[1], i * dt) for i in range(N)]
-    traj[:,1] = [x0[1] + dy(u[0], u[1], i * dt) for i in range(N)]
-    traj[:,2] = x0[2] + u[1] * np.arange(N) * dt
-
-    return traj
-
-
-def local_to_global(pose, arc):
-    """
-    Parameters
-    ----------
-    pose : np.array 
-        [x, y, theta]
-    arc : np.array
-        [x, y, theta]
-    
-    """
-    x = arc[:,0] * np.cos(pose[2]) - arc[:,1] * np.sin(pose[2]) + pose[0]
-    y = arc[:,0] * np.sin(pose[2]) + arc[:,1] * np.cos(pose[2]) + pose[1]
-    theta = wrap_angle(arc[:,2] + pose[2])
-
-    return np.vstack((x, y, theta)).T
-
-
-def depth_to_local_points(depth, cam_pose, cam_params, depth_thresh=50.0, patch_size=20):
-    """Determine global coordinates for depth image
-    
-    Parameters
-    ----------
-    depth : np.array (w, h)
-        Depth image
-    cam_pose : np.array (4, 3)
-        Camera pose in global frame (R, t)
-    cam_params : dict
-        Camera parameters
-    depth_thresh : float
-        Maximum depth value
-    patch_size : int
-        Patch size for sampling depth image
-
-    Returns
-    -------
-    G : np.array (N, 5)
-        Local points and associated pixel coordinates in image
-    
-    """
-    w, h = depth.shape
-
-    I, J = np.mgrid[0:w:patch_size, 0:h:patch_size]
-
-    I = I.flatten()
-    J = J.flatten()
-    D = depth[0:w:patch_size, 0:h:patch_size].flatten()
-    I = I[D < depth_thresh]
-    J = J[D < depth_thresh]
-    D = D[D < depth_thresh]
-
-    G = np.zeros((D.shape[0], 5))
-    G[:,0] = D                                                # x
-    G[:,1] = (J - cam_params['cx']) * D / cam_params['fx']    # y
-    G[:,2] = -(I - cam_params['cy']) * D / cam_params['fy']   # z
-    G[:,3] = I
-    G[:,4] = J
-
-    return G
-
-
-def points_to_cost(points, costmap):
-    """Convert (local) 3D point cloud to (local) cost grid
-    
-    """
-    bins = {}
-    scale = self.cmap_resolution
-
-    for x, y, z in points:
-        x_idx = self.cmap_center[0] - int(x / scale)
-        y_idx = self.cmap_center[1] + int(y / scale)
-        if (x_idx, y_idx) not in bins:
-            bins[(x_idx, y_idx)] = [z]
-        else:
-            bins[(x_idx, y_idx)].append(z)
-
-    return bins
-
-
-def local_to_global_cost(bins, pose):
-    """Convert local cost grid to global cost samples
-    
-    """
-    cost_vals = []                           # TODO: use a longer max_depth for cost_vals 
-    for k, v in bins.items():
-        cost = 500 * np.var(v)
-        self.costmap[k] = cost
-        self.max_costval = max(self.max_costval, cost)
-        local_x = self.cmap_center[0] - k[0]
-        local_y = k[1] - self.cmap_center[1]
-        global_x = local_x * np.cos(pose[2]) - local_y * np.sin(pose[2]) + pose[0]
-        global_y = local_x * np.sin(pose[2]) + local_y * np.cos(pose[2]) + pose[1]
-        cost_vals.append([global_x, global_y, cost])
-    
-    return cost_vals
-
+from nerfnav.autonav_utils import arc, local_to_global, depth_to_points
 
 
 class AutoNav:
@@ -141,7 +27,7 @@ class AutoNav:
 
         # Costmap
         self.cmap_resolution = 2  # m
-        self.max_depth = 40  # m
+        self.max_depth = 25  # m
         W = int(self.max_depth / self.cmap_resolution)
         self.cmap_dims = [W + 1, 2*W + 1]  # m
         self.cmap_center = [W, W]
@@ -152,11 +38,11 @@ class AutoNav:
         self.max_costval = 0
 
         self.cam_params = {'w': 800,
-              'h': 600,
-              'cx': 400, 
-              'cy': 300, 
-              'fx': 400, 
-              'fy': 300}
+                            'h': 600,
+                            'cx': 400, 
+                            'cy': 300, 
+                            'fx': 400, 
+                            'fy': 300}
 
 
     def update_goal(self, goal):
@@ -172,10 +58,12 @@ class AutoNav:
         pose : np.array 
             [x, y, theta]
         """
-        G = depth_to_global(depth, None, self.cam_params, depth_thresh=self.max_depth, patch_size=1)
+        points = depth_to_points(depth, self.cam_params, depth_thresh=self.max_depth, patch_size=1)
+
+        # Bin points into grid
         bins = {}
         scale = self.cmap_resolution
-        for x, y, z in G[:,:3]:
+        for x, y, z in points[:,:3]:
             x_idx = self.cmap_center[0] - int(x / scale)
             y_idx = self.cmap_center[1] + int(y / scale)
             if (x_idx, y_idx) not in bins:
@@ -186,8 +74,10 @@ class AutoNav:
         cost_vals = []                           # TODO: use a longer max_depth for cost_vals 
         for k, v in bins.items():
             cost = 500 * np.var(v)
-            self.costmap[k] = cost
+            self.costmap[k] = cost  # update costmap
             self.max_costval = max(self.max_costval, cost)
+
+            # Convert local coordinates to global coordinates
             local_x = self.cmap_center[0] - k[0]
             local_y = k[1] - self.cmap_center[1]
             global_x = local_x * np.cos(pose[2]) - local_y * np.sin(pose[2]) + pose[0]
@@ -204,10 +94,10 @@ class AutoNav:
         cx, cy = self.cmap_center
         # if x is an array
         if isinstance(x, np.ndarray):
-            return self.costmap[(-x + cx + 0.5).astype(int), (y + cy + 0.5).astype(int)]
+            return self.costmap[(-x + cx + 0.5).astype(int), (-y + cy + 0.5).astype(int)]
         # if x is a scalar
         else:
-            return self.costmap[int(x + cx + 0.5), int(y + cy + 0.5)]
+            return self.costmap[int(-x + cx + 0.5), int(-y + cy + 0.5)]
 
     
     def replan(self, pose):
@@ -245,8 +135,8 @@ class AutoNav:
     def plot_costmap(self, ax, show_arcs=False):
         """
         """
-        im = ax.imshow(self.costmap, alpha=0.5, cmap='viridis_r',
-                       extent=[-self.max_depth, self.max_depth,
+        im = ax.imshow(self.costmap, alpha=0.75, cmap='viridis',
+                       extent=[self.max_depth, -self.max_depth,
                                0, self.max_depth],
                        vmin=0, vmax=50)
         ax.set_xlabel('y (m)')
@@ -255,10 +145,12 @@ class AutoNav:
             # Plot arcs in costmap
             for i, arc in enumerate(self.candidate_arcs):
                 if i == self.opt_idx:
-                    ax.plot(arc[:,1], arc[:,0], 'r')
+                    ax.plot(arc[:,1], arc[:,0], 'r', linewidth=3.0)
                 else:
-                    ax.plot(arc[:,1], arc[:,0], 'b--', alpha=0.5, linewidth=1.0)
-        ax.set_xticks(np.arange(-40, 40, 5))
-        ax.set_yticks(np.arange(0, 40, 5))
+                    ax.plot(arc[:,1], arc[:,0], 'c--', alpha=0.5, linewidth=2.0)
+        ax.set_xticks(np.arange(-self.max_depth, self.max_depth, 5))
+        ax.set_yticks(np.arange(0, self.max_depth, 5))
+        # Invert x axis
+        #ax.invert_xaxis()
         ax.grid(color='gray', linestyle='--', linewidth=0.5)
         return im

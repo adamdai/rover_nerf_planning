@@ -8,56 +8,6 @@ import cv2 as cv
 from nerfnav.utils import rgb2gray
 
 
-def px_to_global(depth, cam_pose, cam_params, px):
-    """Determine global coordinates for pixel coordinate
-    
-    Parameters
-    ----------
-    cam_pose : np.array (4, 3)
-        Camera pose in global frame (R, t)
-    
-    """
-    i, j = px
-    z = depth[i,j]
-    x = (j - cam_params['cx']) * z / cam_params['fx']
-    y = (i - cam_params['cy']) * z / cam_params['fy']
-    local_xyz = np.array([z, x, y])
-    global_xyz = np.dot(cam_pose[:3,:3], local_xyz) + cam_pose[:3,3]
-    return global_xyz
-
-
-def depth_to_global(depth, cam_pose, cam_params, depth_thresh=50.0, patch_size=20):
-    """Determine global coordinates for depth image
-    
-    Parameters
-    ----------
-    cam_pose : np.array (4, 3)
-        Camera pose in global frame (R, t)
-    
-    """
-    w, h = depth.shape
-
-    I, J = np.mgrid[0:w:patch_size, 0:h:patch_size]
-
-    I = I.flatten()
-    J = J.flatten()
-    D = depth[0:w:patch_size, 0:h:patch_size].flatten()
-    I = I[D < depth_thresh]
-    J = J[D < depth_thresh]
-    D = D[D < depth_thresh]
-
-    G = np.zeros((D.shape[0], 5))
-    G[:,0] = D                                                # x
-    G[:,1] = (J - cam_params['cx']) * D / cam_params['fx']    # y
-    G[:,2] = -(I - cam_params['cy']) * D / cam_params['fy']   # z
-    G[:,3] = I
-    G[:,4] = J
-
-    #G[:,0:3] = np.dot(cam_pose[:3,:3], G[:,0:3].T).T + cam_pose[:3,3]
-    return G
-
-
-
 class FeatureMap:
     """Feature map class
 
@@ -82,16 +32,23 @@ class FeatureMap:
         goal_global = (goal_unreal - start_unreal)[:2] / 100.0
         self.scale = np.abs(goal_global[0] / (start_px[1] - goal_px[1]))  # meters per pixel
         # self.scale = scale
-        x_min, y_min = self.img_to_global(0, 0)
-        x_max, y_max = self.img_to_global(self.height, self.width)
+        x_min, y_min = self.img_to_global(self.height, 0)
+        x_max, y_max = self.img_to_global(0, self.width)
         self.bounds = [x_min, x_max, y_min, y_max] 
+
+
+    def in_bounds(self, x, y):
+        """Check if global coordinates are within bounds
+
+        """
+        return x >= self.bounds[0] and x <= self.bounds[1] and y >= self.bounds[2] and y <= self.bounds[3]
 
 
     def img_to_global(self, img_x, img_y):
         """Convert image coordinates to global coordinates
 
         """
-        y = self.scale * (img_x - self.start_px[0])
+        y = self.scale * (-img_x + self.start_px[0])
         x = self.scale * (img_y - self.start_px[1])
         return x, y
     
@@ -100,41 +57,46 @@ class FeatureMap:
         """Convert global coordinates to image coordinates
 
         """
-        img_x = int(y / self.scale) + self.start_px[0]
+        img_x = int(-y / self.scale) + self.start_px[0]
         img_y = int(x / self.scale) + self.start_px[1]
         return img_x, img_y
-    
-
-    def get_img_feature(self, x, y):
-        """Get image feature for global coordinates (x,y)
-
-        """
-        img_x = int(y / self.scale) + self.start_px[0]
-        img_y = int(x / self.scale) + self.start_px[1]
-        return self.img[img_x, img_y, :]
     
 
     def get_img_coords(self, x):
         """Get image coordinates for global coordinates
         
+        Parameters
+        ----------
         x : np.array (N, 2)
             Global coordinates
+        
+        Returns
+        -------
+        np.array (N, 2)
+            Image coordinates
 
         """
-        img_x = np.round(x[:,0] / self.scale).astype(int) + self.start_px[0]
-        img_y = np.round(x[:,1] / self.scale).astype(int) + self.start_px[1]
+        img_x = np.round(-x[:,1] / self.scale).astype(int) + self.start_px[0]
+        img_y = np.round(x[:,0] / self.scale).astype(int) + self.start_px[1]
         return np.array([img_x, img_y]).T
 
 
     def get_features(self, x):
         """
-
+        
+        Parameters
+        ----------
         x : np.array (N, 2)
             Global coordinates
 
+        Returns
+        -------
+        np.array (N, 3)
+            RGB features
+
         """
-        img_x = np.round(x[:,0] / self.scale).astype(int) + self.start_px[0]
-        img_y = np.round(x[:,1] / self.scale).astype(int) + self.start_px[1]
+        img_x = np.round(-x[:,1] / self.scale).astype(int) + self.start_px[0]
+        img_y = np.round(x[:,0] / self.scale).astype(int) + self.start_px[1]
         return self.img[img_x, img_y, :]
     
 
@@ -227,8 +189,8 @@ class CostMap:
         Cluster labels for each pixel
     num_clusters : int
         Number of clusters
-    cluster_pts : list of np.array
-        List of points for each cluster
+    cluster_idxs : list of np.array
+        List of indexes for each cluster
 
     """
     def __init__(self, mat, cluster_labels, cluster_masks):
@@ -237,9 +199,9 @@ class CostMap:
         self.cluster_masks = cluster_masks
         self.mat = mat
 
-        self.cluster_pts = []
+        self.cluster_idxs = []
         for i in range(self.num_clusters):
-            self.cluster_pts.append(np.array(np.where(self.cluster_labels == i)).T)
+            self.cluster_idxs.append(np.array(np.where(self.cluster_labels == i)).T)
 
     # def __call__(self, x, y):
     #     return self.vals[int(self.clusters[x,y])]

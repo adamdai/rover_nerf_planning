@@ -14,8 +14,8 @@ def get_pose2D(client):
     """
     pose = client.simGetVehiclePose()
     x = pose.position.x_val
-    y = pose.position.y_val
-    yaw = airsim.utils.to_eularian_angles(pose.orientation)[2]
+    y = -pose.position.y_val  # y inverted
+    yaw = -airsim.utils.to_eularian_angles(pose.orientation)[2]  # yaw inverted
     return np.array([x, y, yaw])
 
 

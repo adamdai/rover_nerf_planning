@@ -5,8 +5,12 @@
 import numpy as np
 from scipy.interpolate import RBFInterpolator
 from scipy.linalg import LinAlgError
+from sklearn.neighbors import KernelDensity
 
 from nerfnav.astar import AStar
+
+
+SPATIAL_NORM_CONST = 200.0
 
 
 class GlobalPlanner(AStar):
@@ -30,6 +34,16 @@ class GlobalPlanner(AStar):
         self.local_samples = costmap.num_clusters * [None]  # local cost observations (x,y,c) for each cluster
 
         self.max_costval = 0
+
+        # For each cluster, pre-compute features
+        self.cluster_features = []
+
+        for k in range(self.costmap.num_clusters):
+            idxs = self.costmap.cluster_idxs[k]
+            xy = np.stack(self.feat_map.img_to_global(idxs[:,0], idxs[:,1])).T
+            rgb = self.feat_map.img[idxs[:,0], idxs[:,1], :]
+            self.cluster_features.append(np.hstack((xy/SPATIAL_NORM_CONST, rgb/255.0)))
+
 
     def neighbors(self, node):
         x, y = node
@@ -71,10 +85,15 @@ class GlobalPlanner(AStar):
     def plot(self, ax):
         """Plot costmap and path"""
         xmin, xmax, ymin, ymax = self.feat_map.bounds
-        im = ax.imshow(self.costmap.mat, cmap='viridis', extent=[xmin, xmax, ymax, ymin])
+        im = ax.imshow(self.costmap.mat, cmap='viridis', extent=self.feat_map.bounds)
         if self.path is not None:
             ax.plot(self.path[:,0], self.path[:,1], 'r')
             ax.scatter(self.path[:,0], self.path[:,1], c='r', s=10, marker='*')
+        # ax.set_xticks(np.arange(xmin, xmax, 50))
+        # ax.set_yticks(np.arange(ymin, ymax, 50))
+        # Invert x axis
+        #ax.invert_xaxis()
+        ax.grid(color='gray', linestyle='--', linewidth=0.5)
         return im
 
     
@@ -85,8 +104,13 @@ class GlobalPlanner(AStar):
         pose : np.array (3,)
             [x, y, theta]
         """
+        # Reset local samples
+        self.local_samples = self.costmap.num_clusters * [None]
+
         # Update local samples
         for x, y, c in cost_vals:
+            if not self.feat_map.in_bounds(x, y):
+                continue
             i, j = self.feat_map.global_to_img(x, y)
             k = int(self.costmap.cluster_labels[i, j])
             if self.local_samples[k] is None:
@@ -95,38 +119,33 @@ class GlobalPlanner(AStar):
 
         # Interpolate for each cluster
         for k in range(self.costmap.num_clusters):
-            if self.local_samples[k] is None or k == 0:
+            if self.local_samples[k] is None:
                 continue
+
+            print("  cluster ", k)
             ls = np.array(self.local_samples[k])
-            try:
-                # Averaging
-                avg_cost = np.mean(ls[:,2])
-                self.costmap.mat[self.costmap.cluster_masks[k]] = avg_cost
 
-                # RBF 
-                # interp = RBFInterpolator(ls[:,:2], ls[:,2])
-                # X, Y = self.feat_map.img_to_global(self.costmap.cluster_pts[k][:,0], self.costmap.cluster_pts[k][:,1])
-                # vals = interp(np.stack((X, Y), axis=1))
-                # self.costmap.mat[self.costmap.cluster_masks[k]] = np.abs(vals)
-                print("  Updated cluster ", k)
-            except LinAlgError:
-                print(f"  Cluster {k}: LinAlgError")
-                continue
+            # ## Averaging
+            # avg_cost = np.mean(ls[:,2])
+            # self.costmap.mat[self.costmap.cluster_masks[k]] = avg_cost
 
-        # local_cost_mat = np.zeros_like(self.costmap.mat)
-        # for x, y, c in cost_vals:
-        #     i, j = self.feat_map.global_to_img(x, y)
-        #     local_cost_mat[i, j] = c
+            ## KDE
+            rgb_features = self.feat_map.get_features(ls[:,:2])
+            sample_features = np.hstack((ls[:,:2]/SPATIAL_NORM_CONST, rgb_features/255.0))
 
-        # # For each cluster 
-        # for k in range(self.costmap.num_clusters):
-        #     cluster_mask = self.costmap.clusters == k
-        #     mask = cluster_mask * local_cost_mat
-        #     if np.sum(mask) == 0:
-        #         continue
-        #     avg_cost = np.mean(mask[mask > 0])
-        #     self.costmap.vals[k] = avg_cost
-        #     self.costmap.mat[cluster_mask] = avg_cost
+            # Spatial + feature
+            kde = KernelDensity(kernel='gaussian', bandwidth=0.5).fit(sample_features, ls[:,2])
+            costs_fit = np.exp(kde.score_samples(self.cluster_features[k]))
+            # # Feature only
+            # kde = KernelDensity(kernel='linear', bandwidth=0.5).fit(rgb_features/255.0, ls[:,2])
+            # costs_fit = np.exp(kde.score_samples(self.cluster_features[k]))
+
+            print(self.cluster_features[k].shape, self.costmap.mat[self.costmap.cluster_masks[k]].shape)
+
+            #self.costmap.mat[self.costmap.cluster_masks[k]] = np.abs(costs_fit)
+            i = self.costmap.cluster_idxs[k][:,0]
+            j = self.costmap.cluster_idxs[k][:,1]
+            self.costmap.mat[i,j] = np.maximum(np.abs(costs_fit), self.costmap.mat[i,j])
         
         self.max_costval = max(np.max(self.costmap.mat), self.max_costval)
         print("  MAX GLOBAL COST: ", self.max_costval)
