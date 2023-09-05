@@ -1,13 +1,4 @@
-"""Leader and follow cars taking images of each other
-   
-   - Car 2 is leader, car 1 is follower
-   - Car 1 tracks a goal pose that is a fixed distance behind car 2
-
-Notes
------
-    Positive steer turns right, negative turns left
-
-Settings: 'settings_two_car.json'
+"""Run full simulation
 
 """
 
@@ -17,6 +8,7 @@ import os
 import numpy as np
 import time
 from matplotlib import pyplot as plt
+import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import cv2 as cv
 from PIL import Image
@@ -27,15 +19,15 @@ from nerfnav.feature_map import FeatureMap, CostMap
 from nerfnav.global_planner import GlobalPlanner
 
 ## -------------------------- PARAMS ------------------------ ##
-# Unreal environment
+# Unreal environment (FIXME: y inverted)
 # (in unreal units, 100 unreal units = 1 meter)
-UNREAL_PLAYER_START = np.array([-117252.054688, 264463.03125, 25148.908203])
-UNREAL_GOAL = np.array([-83250.0, 258070.0, 24860.0])
+UNREAL_PLAYER_START = np.array([-117252.054688, -264463.03125, 25148.908203])
+UNREAL_GOAL = np.array([-83250.0, -258070.0, 24860.0])
 
 GOAL_POS = (UNREAL_GOAL - UNREAL_PLAYER_START)[:2] / 100.0
 print("GOAL_POS: ", GOAL_POS)
 
-PLAN_TIME = 1.5  # seconds
+PLAN_TIME = 2.5  # seconds
 THROTTLE = 0.4
 MAX_ITERS = 1e5
 GOAL_TOLERANCE = 20  # meters
@@ -43,6 +35,14 @@ GOAL_TOLERANCE = 20  # meters
 VISUALIZE = True
 REPLAN = True
 RECORD = True
+DEBUG = False
+
+# MPL text color
+COLOR = 'white'
+mpl.rcParams['text.color'] = COLOR
+mpl.rcParams['axes.labelcolor'] = COLOR
+mpl.rcParams['xtick.color'] = COLOR
+mpl.rcParams['ytick.color'] = COLOR
 
 ## -------------------------- SETUP ------------------------ ##
 global_img = cv.imread('../../data/airsim/images/test_scenario.png')
@@ -80,7 +80,7 @@ if __name__ == "__main__":
         # Set figure size
         f.set_figwidth(16)
         f.set_figheight(9)
-        f.set_facecolor('gray')
+        f.set_facecolor(0.15 * np.ones(3))
         ax[0,0].set_title("RGB Image")
         ax[0,1].set_title("Depth Image")
         im3 = global_planner.plot(ax[1,1])
@@ -126,23 +126,40 @@ if __name__ == "__main__":
             image = client.simGetImage("FrontCamera", airsim.ImageType.Scene)
             image = cv.imdecode(np.frombuffer(image, np.uint8), -1)
 
+            img_time = time.time()
+            if DEBUG:
+                print("  img capture time: ", img_time - start_time)
+
             cost_vals = autonav.update_costmap(current_pose, depth_float)
+            local_update_time = time.time()
+            if DEBUG:
+                print("  local cost update time: ", local_update_time - img_time)
             if REPLAN:
                 global_planner.update_costmap(cost_vals)
+                global_update_time = time.time()
+                if DEBUG:
+                    print("  global cost update time: ", global_update_time - local_update_time)
             path = global_planner.replan(current_pose)
+            global_replan_time = time.time()
+            if DEBUG:
+                print("  global replan time: ", global_replan_time - global_update_time)
             if len(path) > 1:
                 nav_goal = path[1]
             else:
                 nav_goal = GOAL_POS
             autonav.update_goal(nav_goal)
             arc, cost, w = autonav.replan(current_pose)
+            local_replan_time = time.time()
+            if DEBUG:
+                print("  local replan time: ", local_replan_time - global_replan_time)
 
             car_controls.steering = w / 1.6
             car_controls.throttle = THROTTLE
             client.setCarControls(car_controls)
             #print("steering: ", car_controls.steering, "throttle: ", car_controls.throttle)
             plan_time = time.time() - start_time
-            print("  planning time: ", plan_time)
+            if DEBUG:
+                print("  planning time: ", plan_time)
             if plan_time < PLAN_TIME:
                 time.sleep(PLAN_TIME - plan_time)
             print("--------------------------------------------------------------------------------")
