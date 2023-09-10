@@ -6,8 +6,9 @@ AutoNav rover path planning
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2 as cv
+from sklearn.linear_model import RANSACRegressor
 
-from nerfnav.autonav_utils import arc, local_to_global, depth_to_points, compute_slope_and_roughness
+from nerfnav.autonav_utils import arc, local_to_global, depth_to_points, estimate_hessian_trace, hessian_grid, compute_slope_and_roughness
 
 
 class AutoNav:
@@ -36,6 +37,8 @@ class AutoNav:
         self.goal = goal
         self.opt_idx = None
         self.max_costval = 0
+
+        self.ransac = RANSACRegressor(max_trials=10, residual_threshold=0.01)
 
         self.cam_params = {'w': 800,
                             'h': 600,
@@ -95,6 +98,7 @@ class AutoNav:
             [x, y, theta]
         """
         points = depth_to_points(depth, self.cam_params, depth_thresh=self.max_depth, patch_size=1)
+        centroid = np.mean(points[:,:3], axis=0)
 
         # Bin points into grid
         bins = {}
@@ -103,9 +107,9 @@ class AutoNav:
             x_idx = self.cmap_center[0] - int(x / scale)
             y_idx = self.cmap_center[1] + int(y / scale)
             if (x_idx, y_idx) not in bins:
-                bins[(x_idx, y_idx)] = [(x - int(x), y - int(y), z)]
+                bins[(x_idx, y_idx)] = [(x - centroid[0], y - centroid[1], z - centroid[2])]
             else:
-                bins[(x_idx, y_idx)].append((x - int(x), y - int(y), z))
+                bins[(x_idx, y_idx)].append((x - centroid[0], y - centroid[1], z - centroid[2]))
 
         cost_vals = []                           # TODO: use a longer max_depth for cost_vals 
         for k, v in bins.items():
@@ -118,9 +122,58 @@ class AutoNav:
                 try:
                     # c = estimate_hessian_trace(bin_pts)
                     # print("c: ", c)
-                    slope, roughness = compute_slope_and_roughness(bin_pts)
-                    self.costmap[k] = slope
-                except:
+                    # slope, roughness = compute_slope_and_roughness(bin_pts)
+                    # self.costmap[k] = slope
+                    
+                    self.ransac.fit(bin_pts[:, :2], bin_pts[:, 2])
+                    a, b = self.ransac.estimator_.coef_
+
+                    z_pred = self.ransac.estimator_.predict(bin_pts[:, :2])
+                    loss = z_pred - bin_pts[:, 2]
+
+                    dem = {}
+                    # dem = np.zeros((20, 20))
+
+                    dem_resolution = 0.05
+                    min_x, min_y = np.inf, np.inf
+                    max_x, max_y = -np.inf, -np.inf
+                    for i, (x, y, z) in enumerate(bin_pts):
+                        x = int(x / dem_resolution)
+                        y = int(y / dem_resolution)
+                        min_x = min(min_x, x)
+                        min_y = min(min_y, y)
+                        max_x = max(max_x, x)
+                        max_y = max(max_y, y)
+                        if (x, y) not in dem:
+                            dem[(x, y)] = loss[i]
+                        else:
+                            dem[(x, y)] = max((dem[(x, y)], loss[i]))
+
+                    xy_vals = np.array(list(dem.keys()))
+                    loss_vals = np.array(list(dem.values()))
+
+                    dem_grid = np.zeros((max_x - min_x + 1, max_y - min_y + 1))
+                    dem_grid[xy_vals[:, 0] - min_x, xy_vals[:, 1] - min_y] = loss_vals
+
+                    #roughness = estimate_hessian_trace(np.hstack((xy_vals, loss_vals[:, None])))
+
+                    roughness = hessian_grid(dem_grid)
+
+
+
+
+                    # roughness = np.var(z_pred - bin_pts[:, 2])
+                    # #print("loss: ", np.abs(z_pred - bin_pts[:, 2]))
+
+                    # #outlier_frac = np.count_nonzero(~self.ransac.inlier_mask_) / len(self.ransac.inlier_mask_)
+                    n = np.array([a, b, -1])
+                    n = n / np.linalg.norm(n)
+                    if n[2] < 0:
+                        n = -n
+                    slope = np.abs(np.arccos(np.dot(n, np.array([0, 0, 1]))))
+                    self.costmap[k] = 1.0 * slope + 10.0 * roughness
+                except ValueError as e:
+                    print(e)
                     return bin_pts
 
             # cost = 500 * np.var(v)
@@ -187,7 +240,7 @@ class AutoNav:
         im = ax.imshow(self.costmap, alpha=0.75, cmap='viridis',
                        extent=[self.max_depth, -self.max_depth,
                                0, self.max_depth],
-                       vmin=0, vmax=50)
+                       vmin=0)
         ax.set_xlabel('y (m)')
         ax.set_ylabel('x (m)')
         if show_arcs:
