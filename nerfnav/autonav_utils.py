@@ -5,6 +5,8 @@ Utilities for AutoNav
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2 as cv
+from scipy.optimize import minimize
+from scipy.interpolate import Rbf
 
 from nerfnav.utils import wrap_angle
 
@@ -83,6 +85,42 @@ def depth_to_points(depth, cam_params, depth_thresh=50.0, patch_size=20):
     G[:,4] = J
 
     return G
+
+
+
+def estimate_hessian_trace(samples, lamb=1.0):
+    x, y, z = samples[:,0], samples[:,1], samples[:,2]
+    rbf = Rbf(x, y, z, function='gaussian')
+
+    # First order derivative (to set regularization constraint on smooth surface)
+    def partial_derivatives(params):
+        dx, dy = params
+        fx = (rbf(x+dx, y) - rbf(x-dx, y))/ (2*dx)
+        fy = (rbf(x, y+dy) - rbf(x, y-dy))/ (2*dy)
+        return np.sum(fx**2) + np.sum(fy**2) + lamb * (dx**2 + dy**2)
+
+    # Optimize
+    out = minimize(partial_derivatives, [0.01, 0.01], bounds=[(1e-6, 1), (1e-6, 1)])
+    dx_opt, dy_opt = out.x
+
+    # Second order derivative
+    fxx = (rbf(x+dx_opt, y) - 2*rbf(x, y) + rbf(x-dx_opt, y))/ (dx_opt**2)
+    fyy = (rbf(x, y+dy_opt) - 2*rbf(x, y) + rbf(x, y-dy_opt))/ (dy_opt**2)
+
+    # Estimate trace of Hessian
+    return np.mean(fxx + fyy)
+
+
+def compute_slope_and_roughness(points):
+    """Compute slope and roughness of 3d points"""
+    u, s, vh = np.linalg.svd(points)
+    v1, v2, v3 = vh
+    center = np.mean(points, axis=0)
+    slope = np.arccos(np.dot(v3, np.array([0, 0, 1]))/np.linalg.norm(v3))
+    roughness = np.var(np.abs(np.dot(points - center, v3)))
+    return slope, roughness
+
+
 
 
 def points_to_cost(points, resolution=2, center=[40, 40]):

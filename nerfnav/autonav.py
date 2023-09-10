@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2 as cv
 
-from nerfnav.autonav_utils import arc, local_to_global, depth_to_points
+from nerfnav.autonav_utils import arc, local_to_global, depth_to_points, compute_slope_and_roughness
 
 
 class AutoNav:
@@ -27,7 +27,7 @@ class AutoNav:
 
         # Costmap
         self.cmap_resolution = 2  # m
-        self.max_depth = 25  # m
+        self.max_depth = 50  # m
         W = int(self.max_depth / self.cmap_resolution)
         self.cmap_dims = [W + 1, 2*W + 1]  # m
         self.cmap_center = [W, W]
@@ -51,6 +51,42 @@ class AutoNav:
         self.goal = goal
 
 
+    # def update_costmap(self, pose, depth):
+    #     """
+    #     Parameters
+    #     ----------
+    #     pose : np.array 
+    #         [x, y, theta]
+    #     """
+    #     points = depth_to_points(depth, self.cam_params, depth_thresh=self.max_depth, patch_size=1)
+
+    #     # Bin points into grid
+    #     bins = {}
+    #     scale = self.cmap_resolution
+    #     for x, y, z in points[:,:3]:
+    #         x_idx = self.cmap_center[0] - int(x / scale)
+    #         y_idx = self.cmap_center[1] + int(y / scale)
+    #         if (x_idx, y_idx) not in bins:
+    #             bins[(x_idx, y_idx)] = [z]
+    #         else:
+    #             bins[(x_idx, y_idx)].append(z)
+
+    #     cost_vals = []                           # TODO: use a longer max_depth for cost_vals 
+    #     for k, v in bins.items():
+    #         cost = 500 * np.var(v)
+    #         self.costmap[k] = cost  # update costmap
+    #         self.max_costval = max(self.max_costval, cost)
+
+    #         # Convert local coordinates to global coordinates
+    #         local_x = self.cmap_center[0] - k[0]
+    #         local_y = k[1] - self.cmap_center[1]
+    #         global_x = local_x * np.cos(pose[2]) - local_y * np.sin(pose[2]) + pose[0]
+    #         global_y = local_x * np.sin(pose[2]) + local_y * np.cos(pose[2]) + pose[1]
+    #         cost_vals.append([global_x, global_y, cost])
+
+    #     print("  MAX LOCAL COST: ", self.max_costval)
+    #     return cost_vals
+
     def update_costmap(self, pose, depth):
         """
         Parameters
@@ -67,24 +103,37 @@ class AutoNav:
             x_idx = self.cmap_center[0] - int(x / scale)
             y_idx = self.cmap_center[1] + int(y / scale)
             if (x_idx, y_idx) not in bins:
-                bins[(x_idx, y_idx)] = [z]
+                bins[(x_idx, y_idx)] = [(x - int(x), y - int(y), z)]
             else:
-                bins[(x_idx, y_idx)].append(z)
+                bins[(x_idx, y_idx)].append((x - int(x), y - int(y), z))
 
         cost_vals = []                           # TODO: use a longer max_depth for cost_vals 
         for k, v in bins.items():
-            cost = 500 * np.var(v)
-            self.costmap[k] = cost  # update costmap
-            self.max_costval = max(self.max_costval, cost)
 
-            # Convert local coordinates to global coordinates
-            local_x = self.cmap_center[0] - k[0]
-            local_y = k[1] - self.cmap_center[1]
-            global_x = local_x * np.cos(pose[2]) - local_y * np.sin(pose[2]) + pose[0]
-            global_y = local_x * np.sin(pose[2]) + local_y * np.cos(pose[2]) + pose[1]
-            cost_vals.append([global_x, global_y, cost])
+            bin_pts = np.array(v)
+            
+            if len(bin_pts) > 10:
+                # print("k: ", k)
+                # print("bin_pts: ", len(bin_pts))
+                try:
+                    # c = estimate_hessian_trace(bin_pts)
+                    # print("c: ", c)
+                    slope, roughness = compute_slope_and_roughness(bin_pts)
+                    self.costmap[k] = slope
+                except:
+                    return bin_pts
 
-        print("  MAX LOCAL COST: ", self.max_costval)
+            # cost = 500 * np.var(v)
+            # self.costmap[k] = cost  # update costmap
+            # self.max_costval = max(self.max_costval, cost)
+
+            # # Convert local coordinates to global coordinates
+            # local_x = self.cmap_center[0] - k[0]
+            # local_y = k[1] - self.cmap_center[1]
+            # global_x = local_x * np.cos(pose[2]) - local_y * np.sin(pose[2]) + pose[0]
+            # global_y = local_x * np.sin(pose[2]) + local_y * np.cos(pose[2]) + pose[1]
+            # cost_vals.append([global_x, global_y, cost])
+
         return cost_vals
         
 

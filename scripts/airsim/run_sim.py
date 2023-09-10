@@ -34,7 +34,7 @@ GOAL_TOLERANCE = 20  # meters
 
 VISUALIZE = True
 REPLAN = True
-RECORD = True
+RECORD = False
 DEBUG = False
 
 # MPL text color

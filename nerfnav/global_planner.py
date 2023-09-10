@@ -123,6 +123,7 @@ class GlobalPlanner(AStar):
                 continue
 
             print("  cluster ", k)
+            print("     costs: ", np.sort(np.array(self.local_samples[k])[:,2])[-10:])
             ls = np.array(self.local_samples[k])
 
             # ## Averaging
