@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 import cv2 as cv
 from sklearn.linear_model import RANSACRegressor
 
+from collections import defaultdict
+
+
 from nerfnav.autonav_utils import arc, local_to_global, depth_to_points, estimate_hessian_trace, hessian_grid, compute_slope_and_roughness
 
 
@@ -106,16 +109,16 @@ class AutoNav:
         points = depth_to_points(depth, self.cam_params, depth_thresh=self.max_depth, patch_size=1)
         centroid = np.mean(points[:,:3], axis=0)
 
-        # Bin points into grid
-        bins = {}
+        bins = defaultdict(list)
         scale = self.cmap_resolution
-        for x, y, z in points[:,:3]:
-            x_idx = self.cmap_center[0] - int(x / scale)
-            y_idx = self.cmap_center[1] + int(y / scale)
-            if (x_idx, y_idx) not in bins:
-                bins[(x_idx, y_idx)] = [(x - centroid[0], y - centroid[1], z - centroid[2])]
-            else:
-                bins[(x_idx, y_idx)].append((x - centroid[0], y - centroid[1], z - centroid[2]))
+
+        x_indices = self.cmap_center[0] - (points[:, 0] / scale).astype(int)
+        y_indices = self.cmap_center[1] + (points[:, 1] / scale).astype(int)
+
+        adjusted_points = points - centroid
+
+        for x_idx, y_idx, point in zip(x_indices, y_indices, adjusted_points):
+            bins[(x_idx, y_idx)].append(tuple(point))
 
         cost_vals = []                           # TODO: use a longer max_depth for cost_vals 
         for k, v in bins.items():
