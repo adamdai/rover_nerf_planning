@@ -1,5 +1,12 @@
 """Run full simulation
 
+Scenarios:
+    Test scenario:
+        Player start = (-117252.054688, -264463.03125, 25148.908203)
+        Goal = (-83250.0, -258070.0, 24860.0)
+    Scenario 2:
+        
+
 """
 
 #import airsim_data_collection.common.setup_path
@@ -12,6 +19,7 @@ import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import cv2 as cv
 from PIL import Image
+import pickle
 
 from nerfnav.autonav import AutoNav
 from nerfnav.airsim_utils import get_pose2D, airsim_pose_to_Rt
@@ -27,15 +35,16 @@ UNREAL_GOAL = np.array([-83250.0, -258070.0, 24860.0])
 GOAL_POS = (UNREAL_GOAL - UNREAL_PLAYER_START)[:2] / 100.0
 print("GOAL_POS: ", GOAL_POS)
 
-PLAN_TIME = 2.5  # seconds
-THROTTLE = 0.4
+AUTONAV_REPLAN = 7.5  # seconds
+PLAN_TIME = 7.0  # seconds
+THROTTLE = 0.2
 MAX_ITERS = 1e5
 GOAL_TOLERANCE = 20  # meters
 
 VISUALIZE = True
 REPLAN = True
 RECORD = False
-DEBUG = False
+DEBUG = True
 
 # MPL text color
 COLOR = 'white'
@@ -46,20 +55,23 @@ mpl.rcParams['ytick.color'] = COLOR
 
 ## -------------------------- SETUP ------------------------ ##
 global_img = cv.imread('../../data/airsim/images/test_scenario.png')
-global_img = global_img[::2, ::2, :]  # downscale
-start_px = (138, 141)
-goal_px = (78, 493)
+# global_img = global_img[::2, ::2, :]  # downscale
+global_img = global_img[::4, ::4, :]  # downscale
+# start_px = (138, 141)
+# goal_px = (78, 493)
+start_px = (70, 70)
+goal_px = (38, 248)
 
-costmap_data = np.load('../../data/airsim/costmap.npz')
+costmap_data = np.load('../../data/airsim/ds_costmap.npz', allow_pickle=True)
 costmap = CostMap(costmap_data['mat'], costmap_data['cluster_labels'], costmap_data['cluster_masks'])
 
 feat_map = FeatureMap(global_img, start_px, goal_px, UNREAL_PLAYER_START, UNREAL_GOAL)
 global_planner = GlobalPlanner(costmap, feat_map, goal_px)
 nav_goal = global_planner.replan(np.zeros(3))[1]
 if REPLAN:
-    autonav = AutoNav(nav_goal)
+    autonav = AutoNav(nav_goal, arc_duration=AUTONAV_REPLAN)
 else:
-    autonav = AutoNav(GOAL_POS)
+    autonav = AutoNav(GOAL_POS, arc_duration=AUTONAV_REPLAN)
 
 ## -------------------------- MAIN ------------------------ ##
 if __name__ == "__main__":
@@ -109,6 +121,7 @@ if __name__ == "__main__":
         while idx < MAX_ITERS:
             start_time = time.time()
             current_pose = get_pose2D(client)
+            speed = client.getCarState().speed
             print("idx = ", idx)
             print("  current_pose: ", current_pose)
             print("  nav_goal: ", nav_goal)
@@ -131,14 +144,18 @@ if __name__ == "__main__":
                 print("  img capture time: ", img_time - start_time)
 
             cost_vals = autonav.update_costmap(current_pose, depth_float)
+            arc, cost, w = autonav.replan(current_pose)
             local_update_time = time.time()
             if DEBUG:
                 print("  local cost update time: ", local_update_time - img_time)
             if REPLAN:
                 global_planner.update_costmap(cost_vals)
+                #global_planner.naive_update_costmap(cost_vals)
                 global_update_time = time.time()
                 if DEBUG:
                     print("  global cost update time: ", global_update_time - local_update_time)
+
+            current_pose = get_pose2D(client)
             path = global_planner.replan(current_pose)
             global_replan_time = time.time()
             if DEBUG:
@@ -148,13 +165,15 @@ if __name__ == "__main__":
             else:
                 nav_goal = GOAL_POS
             autonav.update_goal(nav_goal)
-            arc, cost, w = autonav.replan(current_pose)
-            local_replan_time = time.time()
-            if DEBUG:
-                print("  local replan time: ", local_replan_time - global_replan_time)
+
+            # current_pose = get_pose2D(client)
+            # arc, cost, w = autonav.replan(current_pose)
+            # local_replan_time = time.time()
+            # if DEBUG:
+            #     print("  local replan time: ", local_replan_time - global_replan_time)
 
             car_controls.steering = w / 1.6
-            car_controls.throttle = THROTTLE
+            car_controls.throttle = THROTTLE - np.clip(autonav.calc_throttle(speed), -0.2, 0.2)
             client.setCarControls(car_controls)
             #print("steering: ", car_controls.steering, "throttle: ", car_controls.throttle)
             plan_time = time.time() - start_time
@@ -192,6 +211,11 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         if RECORD:
             client.stopRecording()
+
+        print("cluster costs: ", global_planner.cluster_costs)
+        with open('cluster_costs.pickle', 'wb') as handle:
+            pickle.dump(global_planner.cluster_costs, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
         # Restore to original state
         client.reset()
         client.enableApiControl(False)

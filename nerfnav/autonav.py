@@ -21,10 +21,10 @@ class AutoNav:
         self.arc_duration = arc_duration  # seconds
         self.N = int(self.arc_duration / dt)
         N_arcs = 15
-        speed = 3.5  # m/s
+        self.speed = 4.0  # m/s
         max_omega = 0.3  # rad/s
         self.omegas = np.linspace(-max_omega, max_omega, N_arcs)
-        self.candidate_arcs = [arc(np.zeros(3), [speed, w], self.N, dt) for w in self.omegas]
+        self.candidate_arcs = [arc(np.zeros(3), [self.speed, w], self.N, dt) for w in self.omegas]
 
         # Costmap
         self.cmap_resolution = 2  # m
@@ -52,6 +52,12 @@ class AutoNav:
         """
         """
         self.goal = goal
+
+
+    def calc_throttle(self, curr_speed):
+        """
+        """
+        return 0.1 * (curr_speed - 2.0)
 
 
     # def update_costmap(self, pose, depth):
@@ -119,45 +125,64 @@ class AutoNav:
             if len(bin_pts) > 10:
                 # print("k: ", k)
                 # print("bin_pts: ", len(bin_pts))
-                try:
+                #try:
                     # c = estimate_hessian_trace(bin_pts)
                     # print("c: ", c)
                     # slope, roughness = compute_slope_and_roughness(bin_pts)
                     # self.costmap[k] = slope
-                    
-                    self.ransac.fit(bin_pts[:, :2], bin_pts[:, 2])
-                    a, b = self.ransac.estimator_.coef_
 
-                    z_pred = self.ransac.estimator_.predict(bin_pts[:, :2])
-                    loss = z_pred - bin_pts[:, 2]
+                dem = {}
+                dem_resolution = 0.1
+                min_x, min_y = np.inf, np.inf
+                max_x, max_y = -np.inf, -np.inf
+                for i, (x, y, z) in enumerate(bin_pts):
+                    x = int(x / dem_resolution)
+                    y = int(y / dem_resolution)
+                    if (x, y) not in dem:
+                        dem[(x, y)] = z
+                    else:
+                        dem[(x, y)] = max((dem[(x, y)], z))
 
-                    dem = {}
+                xy_vals = np.array(list(dem.keys()))
+                z_vals = np.array(list(dem.values()))
+                #print("xy_vals: ", xy_vals.shape)
+
+                self.ransac = RANSACRegressor(max_trials=10, residual_threshold=0.01)
+                self.ransac.fit(xy_vals, z_vals)
+                a, b = self.ransac.estimator_.coef_
+                # a, b = 0, 0
+
+                z_pred = self.ransac.estimator_.predict(xy_vals)
+                # z_pred = np.zeros(len(z_vals))
+                loss_vals = z_pred - z_vals
+
+                    # dem = {}
                     # dem = np.zeros((20, 20))
 
-                    dem_resolution = 0.05
-                    min_x, min_y = np.inf, np.inf
-                    max_x, max_y = -np.inf, -np.inf
-                    for i, (x, y, z) in enumerate(bin_pts):
-                        x = int(x / dem_resolution)
-                        y = int(y / dem_resolution)
-                        min_x = min(min_x, x)
-                        min_y = min(min_y, y)
-                        max_x = max(max_x, x)
-                        max_y = max(max_y, y)
-                        if (x, y) not in dem:
-                            dem[(x, y)] = loss[i]
-                        else:
-                            dem[(x, y)] = max((dem[(x, y)], loss[i]))
+                    # dem_resolution = 0.1
+                    # min_x, min_y = np.inf, np.inf
+                    # max_x, max_y = -np.inf, -np.inf
+                    # for i, (x, y, z) in enumerate(bin_pts):
+                    #     x = int(x / dem_resolution)
+                    #     y = int(y / dem_resolution)
+                    #     min_x = min(min_x, x)
+                    #     min_y = min(min_y, y)
+                    #     max_x = max(max_x, x)
+                    #     max_y = max(max_y, y)
+                    #     if (x, y) not in dem:
+                    #         dem[(x, y)] = loss[i]
+                    #     else:
+                    #         dem[(x, y)] = max((dem[(x, y)], loss[i]))
 
-                    xy_vals = np.array(list(dem.keys()))
-                    loss_vals = np.array(list(dem.values()))
+                    # xy_vals = np.array(list(dem.keys()))
+                    # loss_vals = np.array(list(dem.values()))
 
-                    dem_grid = np.zeros((max_x - min_x + 1, max_y - min_y + 1))
-                    dem_grid[xy_vals[:, 0] - min_x, xy_vals[:, 1] - min_y] = loss_vals
+                    # dem_grid = np.zeros((max_x - min_x + 1, max_y - min_y + 1))
+                    # dem_grid[xy_vals[:, 0] - min_x, xy_vals[:, 1] - min_y] = loss_vals
 
-                    #roughness = estimate_hessian_trace(np.hstack((xy_vals, loss_vals[:, None])))
+                roughness = estimate_hessian_trace(np.hstack((xy_vals, loss_vals[:, None])))
 
-                    roughness = hessian_grid(dem_grid)
+                    #roughness = hessian_grid(dem_grid)
 
 
 
@@ -166,26 +191,26 @@ class AutoNav:
                     # #print("loss: ", np.abs(z_pred - bin_pts[:, 2]))
 
                     # #outlier_frac = np.count_nonzero(~self.ransac.inlier_mask_) / len(self.ransac.inlier_mask_)
-                    n = np.array([a, b, -1])
-                    n = n / np.linalg.norm(n)
-                    if n[2] < 0:
-                        n = -n
-                    slope = np.abs(np.arccos(np.dot(n, np.array([0, 0, 1]))))
-                    self.costmap[k] = 1.0 * slope + 10.0 * roughness
-                except ValueError as e:
-                    print(e)
-                    return bin_pts
+                n = np.array([a, b, -1])
+                n = n / np.linalg.norm(n)
+                if n[2] < 0:
+                    n = -n
+                slope = np.abs(np.arccos(np.dot(n, np.array([0, 0, 1]))))
+                cost = 1.0 * slope + 10.0 * roughness
+                # except ValueError as e:
+                #     print(e)
+                #     return bin_pts
 
-            # cost = 500 * np.var(v)
-            # self.costmap[k] = cost  # update costmap
-            # self.max_costval = max(self.max_costval, cost)
+                # cost = 500 * np.var(v)
+                self.costmap[k] = cost  # update costmap
+                self.max_costval = max(self.max_costval, cost)
 
-            # # Convert local coordinates to global coordinates
-            # local_x = self.cmap_center[0] - k[0]
-            # local_y = k[1] - self.cmap_center[1]
-            # global_x = local_x * np.cos(pose[2]) - local_y * np.sin(pose[2]) + pose[0]
-            # global_y = local_x * np.sin(pose[2]) + local_y * np.cos(pose[2]) + pose[1]
-            # cost_vals.append([global_x, global_y, cost])
+                # Convert local coordinates to global coordinates
+                local_x = self.cmap_center[0] - k[0]
+                local_y = k[1] - self.cmap_center[1]
+                global_x = local_x * np.cos(pose[2]) - local_y * np.sin(pose[2]) + pose[0]
+                global_y = local_x * np.sin(pose[2]) + local_y * np.cos(pose[2]) + pose[1]
+                cost_vals.append([global_x, global_y, cost])
 
         return cost_vals
         
@@ -240,7 +265,7 @@ class AutoNav:
         im = ax.imshow(self.costmap, alpha=0.75, cmap='viridis',
                        extent=[self.max_depth, -self.max_depth,
                                0, self.max_depth],
-                       vmin=0)
+                       vmin=0, vmax=30)
         ax.set_xlabel('y (m)')
         ax.set_ylabel('x (m)')
         if show_arcs:

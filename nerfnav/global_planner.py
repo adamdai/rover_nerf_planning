@@ -35,14 +35,24 @@ class GlobalPlanner(AStar):
 
         self.max_costval = 0
 
+
+        self.cluster_costs = costmap.num_clusters * [None]
+        for k in range(costmap.num_clusters):
+            self.cluster_costs[k] = []
+
         # For each cluster, pre-compute features
         self.cluster_features = []
+
+        print(self.costmap.cluster_labels.shape)
+        #print(self.costmap.cluster_idxs.shape)
+        print(self.feat_map.img.shape)
 
         for k in range(self.costmap.num_clusters):
             idxs = self.costmap.cluster_idxs[k]
             xy = np.stack(self.feat_map.img_to_global(idxs[:,0], idxs[:,1])).T
             rgb = self.feat_map.img[idxs[:,0], idxs[:,1], :]
-            self.cluster_features.append(np.hstack((xy/SPATIAL_NORM_CONST, rgb/255.0)))
+            #self.cluster_features.append(np.hstack((xy/SPATIAL_NORM_CONST, rgb/255.0)))
+            self.cluster_features.append(rgb/255.0)
 
 
     def neighbors(self, node):
@@ -95,6 +105,23 @@ class GlobalPlanner(AStar):
         #ax.invert_xaxis()
         ax.grid(color='gray', linestyle='--', linewidth=0.5)
         return im
+    
+
+
+    def naive_update_costmap(self, cost_vals):
+        """Update costmap with new cost values
+
+        Parameters
+        ----------
+        cost_vals : list
+            List of cost values (x, y, cost)
+        
+        """
+        for x, y, c in cost_vals:
+            if not self.feat_map.in_bounds(x, y):
+                continue
+            i, j = self.feat_map.global_to_img(x, y)
+            self.costmap.mat[i, j] = c
 
     
     def update_costmap(self, cost_vals):
@@ -117,6 +144,8 @@ class GlobalPlanner(AStar):
                 self.local_samples[k] = []
             self.local_samples[k].append((x, y, c))
 
+            self.cluster_costs[k].append(c)
+
         # Interpolate for each cluster
         for k in range(self.costmap.num_clusters):
             if self.local_samples[k] is None:
@@ -132,7 +161,8 @@ class GlobalPlanner(AStar):
 
             ## KDE
             rgb_features = self.feat_map.get_features(ls[:,:2])
-            sample_features = np.hstack((ls[:,:2]/SPATIAL_NORM_CONST, rgb_features/255.0))
+            #sample_features = np.hstack((ls[:,:2]/SPATIAL_NORM_CONST, rgb_features/255.0))
+            sample_features = rgb_features/255.0
 
             # Spatial + feature
             kde = KernelDensity(kernel='gaussian', bandwidth=0.5).fit(sample_features, ls[:,2])
@@ -146,7 +176,8 @@ class GlobalPlanner(AStar):
             #self.costmap.mat[self.costmap.cluster_masks[k]] = np.abs(costs_fit)
             i = self.costmap.cluster_idxs[k][:,0]
             j = self.costmap.cluster_idxs[k][:,1]
-            self.costmap.mat[i,j] = np.maximum(np.abs(costs_fit), self.costmap.mat[i,j])
+            #self.costmap.mat[i,j] = np.maximum(np.abs(costs_fit), self.costmap.mat[i,j])
+            self.costmap.mat[i,j] = np.abs(costs_fit)
         
         self.max_costval = max(np.max(self.costmap.mat), self.max_costval)
         print("  MAX GLOBAL COST: ", self.max_costval)
