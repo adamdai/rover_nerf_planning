@@ -57,8 +57,8 @@ class GlobalPlanner(AStar):
             idxs = self.costmap.cluster_idxs[k]
             xy = np.stack(self.feat_map.img_to_global(idxs[:,0], idxs[:,1])).T
             rgb = self.feat_map.img[idxs[:,0], idxs[:,1], :]
-            #self.cluster_features.append(np.hstack((xy/SPATIAL_NORM_CONST, rgb/255.0)))
-            self.cluster_features.append(rgb/255.0)
+            self.cluster_features.append(np.hstack((xy/SPATIAL_NORM_CONST, rgb/255.0)))
+            #self.cluster_features.append(rgb/255.0)
 
 
     def neighbors(self, node):
@@ -139,8 +139,12 @@ class GlobalPlanner(AStar):
         """
         in_bound_mask = self.feat_map.in_bounds(cost_vals[:, 0], cost_vals[:, 1])
         valid_cost_vals = cost_vals[in_bound_mask]
-        i, j = self.feat_map.global_to_img(valid_cost_vals[:, 0], valid_cost_vals[:, 1])
+        #i, j = self.feat_map.global_to_img(valid_cost_vals[:, 0], valid_cost_vals[:, 1])
+        coords = self.feat_map.get_img_coords(valid_cost_vals[:,:2])
+        i = coords[:,0]
+        j = coords[:,1]
         k_values = self.costmap.cluster_labels[i, j].astype(int)
+        print(k_values)
 
         scale = self.cmap_resolution
         
@@ -154,8 +158,11 @@ class GlobalPlanner(AStar):
 
             self.cluster_costs[k].append(c)
 
+        print(self.local_samples)
+
         # Interpolate for each cluster
         for k, cluster_samples in enumerate(self.local_samples):
+            print(len(cluster_samples))
             if len(cluster_samples) == 0:
                 continue
 
@@ -172,9 +179,9 @@ class GlobalPlanner(AStar):
             sample_features = np.hstack((xy_vals/SPATIAL_NORM_CONST, rgb_features/255.0))
 
             ## KDE
-            rgb_features = self.feat_map.get_features(ls[:,:2])
-            #sample_features = np.hstack((ls[:,:2]/SPATIAL_NORM_CONST, rgb_features/255.0))
-            sample_features = rgb_features/255.0
+            # rgb_features = self.feat_map.get_features(ls[:,:2])
+            # #sample_features = np.hstack((ls[:,:2]/SPATIAL_NORM_CONST, rgb_features/255.0))
+            # sample_features = rgb_features/255.0
 
             # Spatial + feature
             lreg = LinearRegression().fit(sample_features, costs)
@@ -194,7 +201,7 @@ class GlobalPlanner(AStar):
             self.costmap.mat[i,j] = np.abs(costs_fit)
         
             # Cluster-specific metrics
-            cluster_size = len(ls)
+            cluster_size = len(cluster_samples)
             mean_cost = np.mean(costs_fit)
             median_cost = np.median(costs_fit)
             std_cost = np.std(costs_fit)

@@ -55,14 +55,14 @@ mpl.rcParams['ytick.color'] = COLOR
 
 ## -------------------------- SETUP ------------------------ ##
 global_img = cv.imread('../../data/airsim/images/test_scenario.png')
-# global_img = global_img[::2, ::2, :]  # downscale
-global_img = global_img[::4, ::4, :]  # downscale
-# start_px = (138, 141)
-# goal_px = (78, 493)
-start_px = (70, 70)
-goal_px = (38, 248)
+global_img = global_img[::2, ::2, :]  # downscale
+#global_img = global_img[::4, ::4, :]  # downscale
+start_px = (138, 141)
+goal_px = (78, 493)
+# start_px = (70, 70)
+# goal_px = (38, 248)
 
-costmap_data = np.load('../../data/airsim/ds_costmap.npz', allow_pickle=True)
+costmap_data = np.load('../../data/airsim/costmap.npz', allow_pickle=True)
 costmap = CostMap(costmap_data['mat'], costmap_data['cluster_labels'], costmap_data['cluster_masks'])
 
 feat_map = FeatureMap(global_img, start_px, goal_px, UNREAL_PLAYER_START, UNREAL_GOAL)

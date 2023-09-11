@@ -115,7 +115,7 @@ class AutoNav:
         x_indices = self.cmap_center[0] - (points[:, 0] / scale).astype(int)
         y_indices = self.cmap_center[1] + (points[:, 1] / scale).astype(int)
 
-        adjusted_points = points - centroid
+        adjusted_points = points[:,:3] - centroid
 
         for x_idx, y_idx, point in zip(x_indices, y_indices, adjusted_points):
             bins[(x_idx, y_idx)].append(tuple(point))
@@ -215,7 +215,7 @@ class AutoNav:
                 global_y = local_x * np.sin(pose[2]) + local_y * np.cos(pose[2]) + pose[1]
                 cost_vals.append([global_x, global_y, cost])
 
-        return cost_vals
+        return np.array(cost_vals)
         
 
     def costmap_val(self, x, y):

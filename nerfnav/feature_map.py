@@ -41,7 +41,7 @@ class FeatureMap:
         """Check if global coordinates are within bounds
 
         """
-        return (x >= self.bounds[0])&(x <= self.bounds[1])&(y >= self.bounds[2])&(y <= self.bounds[3])
+        return (x >= self.bounds[0]) & (x <= self.bounds[1]) & (y >= self.bounds[2]) & (y <= self.bounds[3])
 
 
     def img_to_global(self, img_x, img_y):
