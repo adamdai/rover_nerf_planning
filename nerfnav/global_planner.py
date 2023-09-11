@@ -6,8 +6,10 @@ import numpy as np
 from scipy.interpolate import RBFInterpolator
 from scipy.linalg import LinAlgError
 from sklearn.neighbors import KernelDensity
+from sklearn.linear_model import LinearRegression
 
 from nerfnav.astar import AStar
+from collections import defaultdict
 
 
 SPATIAL_NORM_CONST = 200.0
@@ -31,9 +33,11 @@ class GlobalPlanner(AStar):
         self.goal_px = tuple(goal)     # goal in pixel coordinates
         self.goal_tolerance = goal_tolerance
 
-        self.local_samples = costmap.num_clusters * [None]  # local cost observations (x,y,c) for each cluster
+        self.local_samples = [defaultdict(list)] * self.costmap.num_clusters     # dictionary indexed by x,y and stores cost
 
         self.max_costval = 0
+
+        self.cmap_resolution = 2  # m
 
         # For each cluster, pre-compute features
         self.cluster_features = []
@@ -104,53 +108,67 @@ class GlobalPlanner(AStar):
         pose : np.array (3,)
             [x, y, theta]
         """
-        # Reset local samples
-        self.local_samples = self.costmap.num_clusters * [None]
+        in_bound_mask = self.feat_map.in_bounds(cost_vals[:, 0], cost_vals[:, 1])
+        valid_cost_vals = cost_vals[in_bound_mask]
+        i, j = self.feat_map.global_to_img(valid_cost_vals[:, 0], valid_cost_vals[:, 1])
+        k_values = self.costmap.cluster_labels[i, j].astype(int)
+
+        scale = self.cmap_resolution
+        
+        x_indices = (valid_cost_vals[:, 0] / scale).astype(int)
+        y_indices = (valid_cost_vals[:, 1] / scale).astype(int)
+        valid_costs = valid_cost_vals[:, 2]
 
         # Update local samples
-        for x, y, c in cost_vals:
-            if not self.feat_map.in_bounds(x, y):
-                continue
-            i, j = self.feat_map.global_to_img(x, y)
-            k = int(self.costmap.cluster_labels[i, j])
-            if self.local_samples[k] is None:
-                self.local_samples[k] = []
-            self.local_samples[k].append((x, y, c))
+        for k, x, y, c in zip(k_values, x_indices, y_indices, valid_costs):
+            self.local_samples[k][(x, y)] = c
 
         # Interpolate for each cluster
-        for k in range(self.costmap.num_clusters):
-            if self.local_samples[k] is None:
+        for k, cluster_samples in enumerate(self.local_samples):
+            if len(cluster_samples) == 0:
                 continue
 
-            print("  cluster ", k)
-            print("     costs: ", np.sort(np.array(self.local_samples[k])[:,2])[-10:])
-            ls = np.array(self.local_samples[k])
-
-            # ## Averaging
+            xy_vals = np.array(list(cluster_samples.keys()))
+            costs = np.array(list(cluster_samples.values()))
+            
+            # ## Averaging (TODO: update)
             # avg_cost = np.mean(ls[:,2])
             # self.costmap.mat[self.costmap.cluster_masks[k]] = avg_cost
 
-            ## KDE
-            rgb_features = self.feat_map.get_features(ls[:,:2])
-            sample_features = np.hstack((ls[:,:2]/SPATIAL_NORM_CONST, rgb_features/255.0))
+            ## Linear Regression
+            rgb_features = self.feat_map.get_features(xy_vals)
+            sample_features = np.hstack((xy_vals/SPATIAL_NORM_CONST, rgb_features/255.0))
 
             # Spatial + feature
-            kde = KernelDensity(kernel='gaussian', bandwidth=0.5).fit(sample_features, ls[:,2])
-            costs_fit = np.exp(kde.score_samples(self.cluster_features[k]))
+            lreg = LinearRegression().fit(sample_features, costs)
+            costs_fit = lreg.predict(self.cluster_features[k])
+            
             # # Feature only
-            # kde = KernelDensity(kernel='linear', bandwidth=0.5).fit(rgb_features/255.0, ls[:,2])
-            # costs_fit = np.exp(kde.score_samples(self.cluster_features[k]))
+            # lreg = LinearRegression().fit(rgb_features/255.0, costs)
+            # costs_fit = lreg.predict(self.cluster_features[k])
 
-            print(self.cluster_features[k].shape, self.costmap.mat[self.costmap.cluster_masks[k]].shape)
+            # print(self.cluster_features[k].shape, self.costmap.mat[self.costmap.cluster_masks[k]].shape)
 
             #self.costmap.mat[self.costmap.cluster_masks[k]] = np.abs(costs_fit)
             i = self.costmap.cluster_idxs[k][:,0]
             j = self.costmap.cluster_idxs[k][:,1]
-            self.costmap.mat[i,j] = np.maximum(np.abs(costs_fit), self.costmap.mat[i,j])
+            self.costmap.mat[i,j] = np.abs(costs_fit)
         
-        self.max_costval = max(np.max(self.costmap.mat), self.max_costval)
-        print("  MAX GLOBAL COST: ", self.max_costval)
-        print("  Min GLOBAL COST: ", np.min(self.costmap.mat))
+            # Cluster-specific metrics
+            cluster_size = len(ls)
+            mean_cost = np.mean(costs_fit)
+            median_cost = np.median(costs_fit)
+            std_cost = np.std(costs_fit)
+            min_cost = np.min(costs_fit)
+            max_cost = np.max(costs_fit)
+    
+            print(f"Cluster {k} Metrics:")
+            print(f"  Size: {cluster_size}")
+            print(f"  Mean Cost: {mean_cost}")
+            print(f"  Median Cost: {median_cost}")
+            print(f"  Standard Deviation: {std_cost}")
+            print(f"  Min Cost: {min_cost}")
+            print(f"  Max Cost: {max_cost}\n")
     
 
     def update(self, cur_pose):
