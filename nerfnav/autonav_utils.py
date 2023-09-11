@@ -117,9 +117,15 @@ def estimate_hessian_trace(samples, lamb=1.0):
 
 
 def hessian_grid(grid):
-    padded_grid = np.pad(grid, pad_width=((1,1),(1,1)), mode='constant', constant_values=0)
-    dxx, dyy = np.gradient(padded_grid, edge_order=2)
-    return np.max(dxx) + np.max(dyy)
+    max_dxx, max_dyy = 0, 0
+
+    for ds in [1, 2, 4]:
+        ds_grid = grid[::ds, ::ds]
+        padded_grid = np.pad(ds_grid, pad_width=((1,1),(1,1)), mode='constant', constant_values=0)
+        dxx, dyy = np.gradient(padded_grid, edge_order=2)
+        max_dxx = max(max_dxx, np.max(np.abs(dxx)))
+        max_dyy = max(max_dyy, np.max(np.abs(dyy)))
+    return max_dxx + max_dyy
 
 
 

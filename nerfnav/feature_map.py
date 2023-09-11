@@ -195,7 +195,8 @@ class CostMap:
     """
     def __init__(self, mat, cluster_labels, cluster_masks):
         self.cluster_labels = cluster_labels.astype(int)
-        self.num_clusters = len(cluster_masks)
+        #self.num_clusters = len(cluster_masks)
+        self.num_clusters = np.max(self.cluster_labels) + 1
         self.cluster_masks = cluster_masks
         self.mat = mat
 
