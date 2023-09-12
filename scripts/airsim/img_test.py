@@ -99,7 +99,7 @@ if __name__ == "__main__":
         np.save(os.path.normpath(path + 'depth_' + timestamp + '.npy'), depth_float)
         depth_image = Image.fromarray(depth_float)
         depth_image = depth_image.convert("L")
-        depth_image.save(os.path.normpath(path + 'depth_' + timestamp + '.png'))
+        #depth_image.save(os.path.normpath(path + 'depth_' + timestamp + '.png'))
 
     print("captured image")
 

@@ -2,10 +2,11 @@
 
 Scenarios:
     Test scenario:
-        Player start = (-117252.054688, -264463.03125, 25148.908203)
-        Goal = (-83250.0, -258070.0, 24860.0)
+        Player start = (-117252.054688, 264463.03125, 25148.908203)
+        Goal = (-83250.0, 258070.0, 24860.0)
     Scenario 2:
-        
+        Player start = (-38344.066406, 21656.935547, 30672.384766)
+        Goal = (75536.0, 102175.0, 25713.0)
 
 """
 
@@ -35,9 +36,9 @@ UNREAL_GOAL = np.array([-83250.0, -258070.0, 24860.0])
 GOAL_POS = (UNREAL_GOAL - UNREAL_PLAYER_START)[:2] / 100.0
 print("GOAL_POS: ", GOAL_POS)
 
-AUTONAV_REPLAN = 7.5  # seconds
+AUTONAV_REPLAN = 10.0  # seconds
 PLAN_TIME = 7.0  # seconds
-THROTTLE = 0.2
+THROTTLE = 0.35
 MAX_ITERS = 1e5
 GOAL_TOLERANCE = 20  # meters
 
@@ -66,7 +67,7 @@ costmap_data = np.load('../../data/airsim/costmap.npz', allow_pickle=True)
 costmap = CostMap(costmap_data['mat'], costmap_data['cluster_labels'], costmap_data['cluster_masks'])
 
 feat_map = FeatureMap(global_img, start_px, goal_px, UNREAL_PLAYER_START, UNREAL_GOAL)
-global_planner = GlobalPlanner(costmap, feat_map, goal_px)
+global_planner = GlobalPlanner(costmap, feat_map, goal_px, interp_method='krr', interp_features='rgb')
 nav_goal = global_planner.replan(np.zeros(3))[1]
 if REPLAN:
     autonav = AutoNav(nav_goal, arc_duration=AUTONAV_REPLAN)
@@ -96,6 +97,12 @@ if __name__ == "__main__":
         ax[0,0].set_title("RGB Image")
         ax[0,1].set_title("Depth Image")
         im3 = global_planner.plot(ax[1,1])
+        ax[1,0].set_title("Local costmap")
+        ax[1,0].set_xlabel("y (m)")
+        ax[1,0].set_ylabel("x (m)")
+        ax[1,1].set_title("Global costmap")
+        ax[1,1].set_xlabel("x (m)")
+        ax[1,1].set_ylabel("y (m)")
         plt.ion()
         plt.show()
 
@@ -112,6 +119,7 @@ if __name__ == "__main__":
 
     # release the brake
     car_controls.brake = 0
+    speed = 2.5
 
     # start recording data
     if RECORD:
@@ -121,7 +129,6 @@ if __name__ == "__main__":
         while idx < MAX_ITERS:
             start_time = time.time()
             current_pose = get_pose2D(client)
-            speed = client.getCarState().speed
             print("idx = ", idx)
             print("  current_pose: ", current_pose)
             print("  nav_goal: ", nav_goal)
@@ -135,6 +142,7 @@ if __name__ == "__main__":
             cam_pose = airsim_pose_to_Rt(camera_info.pose)
             depth_float = np.array(responses[0].image_data_float)
             depth_float = depth_float.reshape(responses[0].height, responses[0].width)
+            depth_float[depth_float > 100] = 100.0
             # Get RGB image
             image = client.simGetImage("FrontCamera", airsim.ImageType.Scene)
             image = cv.imdecode(np.frombuffer(image, np.uint8), -1)
@@ -144,7 +152,7 @@ if __name__ == "__main__":
                 print("  img capture time: ", img_time - start_time)
 
             cost_vals = autonav.update_costmap(current_pose, depth_float)
-            arc, cost, w = autonav.replan(current_pose)
+            # arc, cost, w = autonav.replan(current_pose)
             local_update_time = time.time()
             if DEBUG:
                 print("  local cost update time: ", local_update_time - img_time)
@@ -166,53 +174,77 @@ if __name__ == "__main__":
                 nav_goal = GOAL_POS
             autonav.update_goal(nav_goal)
 
-            # current_pose = get_pose2D(client)
-            # arc, cost, w = autonav.replan(current_pose)
-            # local_replan_time = time.time()
-            # if DEBUG:
-            #     print("  local replan time: ", local_replan_time - global_replan_time)
+            current_pose = get_pose2D(client)
+            arc, cost, w = autonav.replan(current_pose)
+            local_replan_time = time.time()
+            if DEBUG:
+                print("  local replan time: ", local_replan_time - global_replan_time)
 
-            car_controls.steering = w / 1.6
-            car_controls.throttle = THROTTLE - np.clip(autonav.calc_throttle(speed), -0.2, 0.2)
-            client.setCarControls(car_controls)
-            #print("steering: ", car_controls.steering, "throttle: ", car_controls.throttle)
             plan_time = time.time() - start_time
             if DEBUG:
                 print("  planning time: ", plan_time)
-            if plan_time < PLAN_TIME:
-                time.sleep(PLAN_TIME - plan_time)
-            print("--------------------------------------------------------------------------------")
+
+            # Drive for 7.5 seconds
+            car_controls.brake = 0
+            car_controls.steering = w / 1.6
+            #speed = client.getCarState().speed
+            car_controls.throttle = THROTTLE + 0.2 * max(2.5 - speed, 0)
+            print("speed: ", speed, "throttle: ", car_controls.throttle)
+            client.setCarControls(car_controls)
 
             if VISUALIZE:
-                #ax1.clear(); ax2.clear(); ax3.clear()
+                title_font = 16
                 ax[0,0].clear(); ax[0,1].clear(); ax[1,0].clear(); ax[1,1].clear()
-                ax[0,0].set_title("RGB Image")
-                ax[0,1].set_title("Depth Image")
+                ax[0,0].set_title("RGB Image", fontsize=title_font)
+                ax[0,1].set_title("Depth Image", fontsize=title_font)
                 ax[0,0].imshow(image)
-                # depth_image = Image.fromarray(depth_float)
-                # depth_image = depth_image.convert("L")
-                # ax[0,1].imshow(depth_image)
                 ax[0,1].imshow(depth_float)
+                ax[0,0].axis('off')
+                ax[0,1].axis('off')
                 im2 = autonav.plot_costmap(ax[1,0], show_arcs=True)
-                ax[1,0].set_title(f"Local costmap \n Max cost = {np.max(autonav.costmap)}")
+                ax[1,0].set_title("Local costmap", fontsize=title_font)
                 ax[1,0].set_xlabel("y (m)")
                 ax[1,0].set_ylabel("x (m)")
                 im3 = global_planner.plot(ax[1,1])
-                ax[1,1].set_title(f"Global costmap \n Max cost = {np.max(global_planner.costmap.mat)}")
+                ax[1,1].set_title("Global costmap", fontsize=title_font)
                 ax[1,1].set_xlabel("x (m)")
                 ax[1,1].set_ylabel("y (m)")
                 #cbar3.set_clim(vmin=0, vmax=np.max(global_planner.costmap))
                 # plt.colorbar(im3, ax=ax[1], fraction=0.05, aspect=10)  # FIXME: makes a new colorbar every time
-                plt.pause(autonav.arc_duration - PLAN_TIME)
+                #plt.pause(autonav.arc_duration - PLAN_TIME)
+                plt.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05, wspace=0.15, hspace=0.05)
+                # if plan_time < AUTONAV_REPLAN:
+                #     plt.pause(AUTONAV_REPLAN - plan_time)
+                # else:
+                #     plt.pause(0.01)
+                plt.pause(AUTONAV_REPLAN)
             else:
-                time.sleep(autonav.arc_duration - PLAN_TIME)
+                #time.sleep(autonav.arc_duration - PLAN_TIME)
+                time.sleep(AUTONAV_REPLAN)
+                # if plan_time < AUTONAV_REPLAN:
+                #     time.sleep(AUTONAV_REPLAN - plan_time)
+
+
+            speed = client.getCarState().speed
+            
+            # brake the car
+            car_controls.brake = 1
+            car_controls.throttle = 0
+            client.setCarControls(car_controls)
+            
+            #print("steering: ", car_controls.steering, "throttle: ", car_controls.throttle)
+            
+            # if plan_time < PLAN_TIME:
+            #     time.sleep(PLAN_TIME - plan_time)
+            print("--------------------------------------------------------------------------------")
+
             idx += 1
     
     except KeyboardInterrupt:
         if RECORD:
             client.stopRecording()
 
-        print("cluster costs: ", global_planner.cluster_costs)
+        #print("cluster costs: ", global_planner.cluster_costs)
         with open('cluster_costs.pickle', 'wb') as handle:
             pickle.dump(global_planner.cluster_costs, handle, protocol=pickle.HIGHEST_PROTOCOL)
 

@@ -12,10 +12,10 @@ client.confirmConnection()
 pose = client.simGetVehiclePose()
 
 # print pose
-print("x={}, y={}, z={}".format(pose.position.x_val, pose.position.y_val, pose.position.z_val))
+#print("x={}, y={}, z={}".format(pose.position.x_val, pose.position.y_val, pose.position.z_val))
 
 pose2D = get_pose2D(client)
-print("theta={}".format(pose2D[2]))
+print(pose2D)
 
 # Camera pose
 # client = airsim.VehicleClient()

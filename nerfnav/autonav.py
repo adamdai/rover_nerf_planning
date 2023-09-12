@@ -16,15 +16,18 @@ from nerfnav.autonav_utils import arc, local_to_global, depth_to_points, estimat
 
 class AutoNav:
 
-    def __init__(self, goal, arc_duration=5.0):
+    def __init__(self, goal, arc_duration=5.0, method='ransac'):
         """
         """
+
+        self.cost_method = method  # 'ransac', 'variance'
+
         # Candidate arc parameters
         dt = 0.1
         self.arc_duration = arc_duration  # seconds
         self.N = int(self.arc_duration / dt)
         N_arcs = 15
-        self.speed = 4.0  # m/s
+        self.speed = 2.0  # m/s
         max_omega = 0.3  # rad/s
         self.omegas = np.linspace(-max_omega, max_omega, N_arcs)
         self.candidate_arcs = [arc(np.zeros(3), [self.speed, w], self.N, dt) for w in self.omegas]
@@ -43,12 +46,12 @@ class AutoNav:
 
         self.ransac = RANSACRegressor(max_trials=10, residual_threshold=0.01)
 
-        self.cam_params = {'w': 800,
-                            'h': 600,
-                            'cx': 400, 
-                            'cy': 300, 
-                            'fx': 400, 
-                            'fy': 300}
+        self.cam_params = {'w': 720,
+                            'h': 360,
+                            'cx': 360, 
+                            'cy': 180, 
+                            'fx': 360, 
+                            'fy': 180}
 
 
     def update_goal(self, goal):
@@ -60,7 +63,7 @@ class AutoNav:
     def calc_throttle(self, curr_speed):
         """
         """
-        return 0.1 * (curr_speed - 2.0)
+        return 0.1 * (curr_speed - 2.5)
 
 
     # def update_costmap(self, pose, depth):
@@ -72,18 +75,16 @@ class AutoNav:
     #     """
     #     points = depth_to_points(depth, self.cam_params, depth_thresh=self.max_depth, patch_size=1)
 
-    #     # Bin points into grid
-    #     bins = {}
+    #     bins = defaultdict(list)
     #     scale = self.cmap_resolution
-    #     for x, y, z in points[:,:3]:
-    #         x_idx = self.cmap_center[0] - int(x / scale)
-    #         y_idx = self.cmap_center[1] + int(y / scale)
-    #         if (x_idx, y_idx) not in bins:
-    #             bins[(x_idx, y_idx)] = [z]
-    #         else:
-    #             bins[(x_idx, y_idx)].append(z)
 
-    #     cost_vals = []                           # TODO: use a longer max_depth for cost_vals 
+    #     x_indices = self.cmap_center[0] - (points[:, 0] / scale).astype(int)
+    #     y_indices = self.cmap_center[1] + (points[:, 1] / scale).astype(int)
+
+    #     for x_idx, y_idx, point in zip(x_indices, y_indices, points[:,:3]):
+    #         bins[(x_idx, y_idx)].append(point[2])
+
+    #     cost_vals = []                          
     #     for k, v in bins.items():
     #         cost = 500 * np.var(v)
     #         self.costmap[k] = cost  # update costmap
@@ -91,13 +92,13 @@ class AutoNav:
 
     #         # Convert local coordinates to global coordinates
     #         local_x = self.cmap_center[0] - k[0]
-    #         local_y = k[1] - self.cmap_center[1]
+    #         local_y = self.cmap_center[1] - k[1]
     #         global_x = local_x * np.cos(pose[2]) - local_y * np.sin(pose[2]) + pose[0]
     #         global_y = local_x * np.sin(pose[2]) + local_y * np.cos(pose[2]) + pose[1]
     #         cost_vals.append([global_x, global_y, cost])
 
     #     print("  MAX LOCAL COST: ", self.max_costval)
-    #     return cost_vals
+    #     return np.array(cost_vals)
 
     def update_costmap(self, pose, depth):
         """
@@ -120,20 +121,12 @@ class AutoNav:
         for x_idx, y_idx, point in zip(x_indices, y_indices, adjusted_points):
             bins[(x_idx, y_idx)].append(tuple(point))
 
-        cost_vals = []                           # TODO: use a longer max_depth for cost_vals 
+        cost_vals = []                          
         for k, v in bins.items():
 
             bin_pts = np.array(v)
             
             if len(bin_pts) > 10:
-                # print("k: ", k)
-                # print("bin_pts: ", len(bin_pts))
-                #try:
-                    # c = estimate_hessian_trace(bin_pts)
-                    # print("c: ", c)
-                    # slope, roughness = compute_slope_and_roughness(bin_pts)
-                    # self.costmap[k] = slope
-
                 dem = {}
                 dem_resolution = 0.1
                 min_x, min_y = np.inf, np.inf
@@ -159,61 +152,28 @@ class AutoNav:
                 # z_pred = np.zeros(len(z_vals))
                 loss_vals = z_pred - z_vals
 
-                    # dem = {}
-                    # dem = np.zeros((20, 20))
-
-                    # dem_resolution = 0.1
-                    # min_x, min_y = np.inf, np.inf
-                    # max_x, max_y = -np.inf, -np.inf
-                    # for i, (x, y, z) in enumerate(bin_pts):
-                    #     x = int(x / dem_resolution)
-                    #     y = int(y / dem_resolution)
-                    #     min_x = min(min_x, x)
-                    #     min_y = min(min_y, y)
-                    #     max_x = max(max_x, x)
-                    #     max_y = max(max_y, y)
-                    #     if (x, y) not in dem:
-                    #         dem[(x, y)] = loss[i]
-                    #     else:
-                    #         dem[(x, y)] = max((dem[(x, y)], loss[i]))
-
-                    # xy_vals = np.array(list(dem.keys()))
-                    # loss_vals = np.array(list(dem.values()))
-
-                    # dem_grid = np.zeros((max_x - min_x + 1, max_y - min_y + 1))
-                    # dem_grid[xy_vals[:, 0] - min_x, xy_vals[:, 1] - min_y] = loss_vals
-
                 roughness = estimate_hessian_trace(np.hstack((xy_vals, loss_vals[:, None])))
 
-                    #roughness = hessian_grid(dem_grid)
-
-
-
-
-                    # roughness = np.var(z_pred - bin_pts[:, 2])
-                    # #print("loss: ", np.abs(z_pred - bin_pts[:, 2]))
-
-                    # #outlier_frac = np.count_nonzero(~self.ransac.inlier_mask_) / len(self.ransac.inlier_mask_)
                 n = np.array([a, b, -1])
                 n = n / np.linalg.norm(n)
                 if n[2] < 0:
                     n = -n
                 slope = np.abs(np.arccos(np.dot(n, np.array([0, 0, 1]))))
-                cost = 1.0 * slope + 10.0 * roughness
-                # except ValueError as e:
-                #     print(e)
-                #     return bin_pts
-
-                # cost = 500 * np.var(v)
+                cost = 1.0 * slope + 20.0 * roughness
+                
                 self.costmap[k] = cost  # update costmap
                 self.max_costval = max(self.max_costval, cost)
 
                 # Convert local coordinates to global coordinates
                 local_x = self.cmap_center[0] - k[0]
-                local_y = k[1] - self.cmap_center[1]
+                local_y = self.cmap_center[1] - k[1]
                 global_x = local_x * np.cos(pose[2]) - local_y * np.sin(pose[2]) + pose[0]
                 global_y = local_x * np.sin(pose[2]) + local_y * np.cos(pose[2]) + pose[1]
                 cost_vals.append([global_x, global_y, cost])
+
+        # Convolve costmap with uniform kernel
+        # kernel = np.ones((3,3)) / 9
+        # self.costmap = cv.filter2D(self.costmap, -1, kernel)
 
         return np.array(cost_vals)
         
@@ -234,6 +194,7 @@ class AutoNav:
         """
         
         """
+        print(self.costmap.shape)
         costs = np.zeros(len(self.omegas))
         costmap_costs = np.zeros(len(self.omegas))
         global_costs = np.zeros(len(self.omegas))
