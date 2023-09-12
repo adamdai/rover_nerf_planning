@@ -36,7 +36,7 @@ UNREAL_GOAL = np.array([-83250.0, -258070.0, 24860.0])
 GOAL_POS = (UNREAL_GOAL - UNREAL_PLAYER_START)[:2] / 100.0
 print("GOAL_POS: ", GOAL_POS)
 
-AUTONAV_REPLAN = 10.0  # seconds
+AUTONAV_REPLAN = 7.5  # seconds
 PLAN_TIME = 7.0  # seconds
 THROTTLE = 0.35
 MAX_ITERS = 1e5
@@ -134,6 +134,7 @@ if __name__ == "__main__":
             print("  nav_goal: ", nav_goal)
             if np.linalg.norm(current_pose[:2] - GOAL_POS) < GOAL_TOLERANCE:
                 print("Reached goal!")
+                print("TOTAL COST: ", autonav.total_cost)
                 break
 
             # Get depth image
@@ -166,7 +167,7 @@ if __name__ == "__main__":
             current_pose = get_pose2D(client)
             path = global_planner.replan(current_pose)
             global_replan_time = time.time()
-            if DEBUG:
+            if DEBUG and REPLAN:
                 print("  global replan time: ", global_replan_time - global_update_time)
             if len(path) > 1:
                 nav_goal = path[1]
@@ -186,9 +187,9 @@ if __name__ == "__main__":
 
             # Drive for 7.5 seconds
             car_controls.brake = 0
-            car_controls.steering = w / 1.6
+            car_controls.steering = w / 1.2
             #speed = client.getCarState().speed
-            car_controls.throttle = THROTTLE + 0.2 * max(2.5 - speed, 0)
+            car_controls.throttle = THROTTLE + np.clip(0.2 * (2.5 - speed), 0, 0.2)
             print("speed: ", speed, "throttle: ", car_controls.throttle)
             client.setCarControls(car_controls)
 
@@ -236,6 +237,7 @@ if __name__ == "__main__":
             
             # if plan_time < PLAN_TIME:
             #     time.sleep(PLAN_TIME - plan_time)
+            print("TOTAL COST: ", autonav.total_cost)
             print("--------------------------------------------------------------------------------")
 
             idx += 1
@@ -243,6 +245,8 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         if RECORD:
             client.stopRecording()
+
+        print("TOTAL COST: ", autonav.total_cost)
 
         #print("cluster costs: ", global_planner.cluster_costs)
         with open('cluster_costs.pickle', 'wb') as handle:

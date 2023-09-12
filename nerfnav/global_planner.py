@@ -13,7 +13,7 @@ from nerfnav.astar import AStar
 from collections import defaultdict
 
 
-SPATIAL_NORM_CONST = 200.0
+SPATIAL_NORM_CONST = 500.0
 
 
 class GlobalPlanner(AStar):

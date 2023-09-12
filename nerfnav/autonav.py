@@ -27,7 +27,7 @@ class AutoNav:
         self.arc_duration = arc_duration  # seconds
         self.N = int(self.arc_duration / dt)
         N_arcs = 15
-        self.speed = 2.0  # m/s
+        self.speed = 3.0  # m/s
         max_omega = 0.3  # rad/s
         self.omegas = np.linspace(-max_omega, max_omega, N_arcs)
         self.candidate_arcs = [arc(np.zeros(3), [self.speed, w], self.N, dt) for w in self.omegas]
@@ -43,6 +43,7 @@ class AutoNav:
         self.goal = goal
         self.opt_idx = None
         self.max_costval = 0
+        self.total_cost = 0
 
         self.ransac = RANSACRegressor(max_trials=10, residual_threshold=0.01)
 
@@ -107,6 +108,8 @@ class AutoNav:
         pose : np.array 
             [x, y, theta]
         """
+        self.costmap = np.zeros(self.cmap_dims) 
+
         points = depth_to_points(depth, self.cam_params, depth_thresh=self.max_depth, patch_size=1)
         centroid = np.mean(points[:,:3], axis=0)
 
@@ -144,7 +147,13 @@ class AutoNav:
                 #print("xy_vals: ", xy_vals.shape)
 
                 self.ransac = RANSACRegressor(max_trials=10, residual_threshold=0.01)
-                self.ransac.fit(xy_vals, z_vals)
+                try:
+                    self.ransac.fit(xy_vals, z_vals)
+                except:
+                    print("RANSAC failed")
+                    print("xy_vals: ", xy_vals.shape)
+                    print("z_vals: ", z_vals.shape)
+                    continue
                 a, b = self.ransac.estimator_.coef_
                 # a, b = 0, 0
 
@@ -172,7 +181,7 @@ class AutoNav:
                 cost_vals.append([global_x, global_y, cost])
 
         # Convolve costmap with uniform kernel
-        # kernel = np.ones((3,3)) / 9
+        # kernel = np.ones((3,3)) / 2
         # self.costmap = cv.filter2D(self.costmap, -1, kernel)
 
         return np.array(cost_vals)
@@ -217,6 +226,8 @@ class AutoNav:
         # print("global costs: ", global_costs)
         idx = np.argmin(costs)
         self.opt_idx = idx
+
+        self.total_cost += costmap_costs[idx]
 
         # print("optimal cost: ", costs[idx])
 
