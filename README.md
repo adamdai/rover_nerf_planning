@@ -1,4 +1,4 @@
-# NeRFNav
+# Rover NeRF Planning
 
 Neural Radiance Field (NeRF) based path planning for planetary rovers.
 
