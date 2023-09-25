@@ -16,20 +16,14 @@ Clone the GitHub repository:
 
     git clone https://github.com/adamdai/rover_nerf_planning.git
 
-Create conda environment:
+Create and activate conda environment:
 
-    conda create -n rover_nerf python=3.8
-
-Active the environment:
-   
+    conda create -n rover_nerf python=3.8   
     conda activate rover_nerf
     
 Install dependencies:
 
     pip install -r requirements.txt
-   
-Install `rover_nerf` locally from directory containing `setup.py`
-   
     pip install -e .
 
 ## NeRF training
