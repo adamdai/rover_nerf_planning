@@ -67,6 +67,6 @@ Follow steps: https://microsoft.github.io/AirSim/unreal_custenv/
 ### Run simulation
 
 1. Open Unreal project
-2. Start simulation
+2. Press play to start simulation 
 3. Open terminal and activate `airsim_rover` environment
 4. Run `run_sim.py`
