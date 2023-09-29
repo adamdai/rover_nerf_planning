@@ -59,10 +59,11 @@ For AirSim, we need to create a separate conda environment, since there is some 
        
 ### Setup custom Unreal environment
 
-1. Create new Unreal project: Game > Blank > C++
+1. Create new Unreal project: Game > Blank > C++. Then close project.
 2. Acquire Unreal environment: https://www.unrealengine.com/marketplace/en-US/product/moon-landscape-01
-3. From Epic games launcher, add "Moon Landscape" to newly created project
-4. Follow steps in https://microsoft.github.io/AirSim/unreal_custenv/ to add AirSim to project
+3. From Epic games launcher, add "Moon Landscape" to newly created project. Then re-open project.
+4. In Edit > Project Settings > Default Maps, set Editor Startup Map and Game Startup Map to "Moon_Landscape"
+5. Follow steps in https://microsoft.github.io/AirSim/unreal_custenv/ to add AirSim to project
 
 ### Run simulation
 
