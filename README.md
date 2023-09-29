@@ -48,6 +48,7 @@ Follow steps to install Unreal Engine 4.27 (https://microsoft.github.io/AirSim/b
 ### Install AirSim.
 
 Follow steps: https://microsoft.github.io/AirSim/build_windows/#build-airsim
+ - Install Visual Studio 2022
 
 For AirSim, we need to create a separate conda environment, since there is some incompatibility with the jupyter and airsim package dependencies.
     
@@ -57,6 +58,8 @@ For AirSim, we need to create a separate conda environment, since there is some 
     pip install -e .
        
 ### Setup custom Unreal environment
+
+Create new Unreal project: C++
 
 Unreal environment: https://www.unrealengine.com/marketplace/en-US/product/moon-landscape-01
 Follow steps: https://microsoft.github.io/AirSim/unreal_custenv/ 
