@@ -24,9 +24,10 @@ Install dependencies:
     pip install -r requirements.txt
     pip install -e .
 
-Install pytorch (https://pytorch.org/get-started/locally/)
-    
-    conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+Install pytorch (https://pytorch.org/get-started/locally/), may need to reboot after first line
+
+    sudo apt install -y nvidia-cuda-toolkit
+    pip3 install torch torchvision torchaudio
 
 ## NeRF training
 
