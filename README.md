@@ -24,6 +24,10 @@ Install dependencies:
     pip install -r requirements.txt
     pip install -e .
 
+Install pytorch (https://pytorch.org/get-started/locally/)
+    
+    conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+
 ## NeRF training
 
 We use [nerfstudio]((https://docs.nerf.studio/en/latest/)) for NeRF training, rendering, evaluation, and other utilities. We collect imagery of the environment using AirSim, 
