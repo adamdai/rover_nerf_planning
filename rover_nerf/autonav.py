@@ -11,7 +11,7 @@ from sklearn.linear_model import RANSACRegressor
 from collections import defaultdict
 
 
-from nerfnav.autonav_utils import arc, local_to_global, depth_to_points, estimate_hessian_trace, hessian_grid, compute_slope_and_roughness
+from rover_nerf.autonav_utils import arc, local_to_global, depth_to_points, estimate_hessian_trace, hessian_grid, compute_slope_and_roughness
 
 
 class AutoNav:

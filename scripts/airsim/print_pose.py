@@ -3,7 +3,7 @@
 """
 
 import airsim
-from nerfnav.airsim_utils import get_pose2D, get_pose3D
+from rover_nerf.airsim_utils import get_pose2D, get_pose3D
 
 # Rover pose
 client = airsim.CarClient()

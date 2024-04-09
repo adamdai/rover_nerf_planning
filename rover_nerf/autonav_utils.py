@@ -9,7 +9,7 @@ from scipy.optimize import minimize
 from scipy.interpolate import Rbf
 from sklearn.linear_model import RANSACRegressor
 
-from nerfnav.utils import wrap_angle
+from rover_nerf.utils import wrap_angle
 
 
 def arc(x0, u, N, dt):

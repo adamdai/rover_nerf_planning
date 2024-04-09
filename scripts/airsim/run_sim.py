@@ -22,10 +22,10 @@ import cv2 as cv
 from PIL import Image
 import pickle
 
-from nerfnav.autonav import AutoNav
-from nerfnav.airsim_utils import get_pose2D, airsim_pose_to_Rt
-from nerfnav.feature_map import FeatureMap, CostMap
-from nerfnav.global_planner import GlobalPlanner
+from rover_nerf.autonav import AutoNav
+from rover_nerf.airsim_utils import get_pose2D, airsim_pose_to_Rt
+from rover_nerf.feature_map import FeatureMap, CostMap
+from rover_nerf.global_planner import GlobalPlanner
 
 ## -------------------------- PARAMS ------------------------ ##
 # Unreal environment (FIXME: y inverted)

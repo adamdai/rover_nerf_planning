@@ -5,7 +5,7 @@
 import numpy as np
 import cv2 as cv
 
-from nerfnav.utils import rgb2gray
+from rover_nerf.utils import rgb2gray
 
 
 class FeatureMap:

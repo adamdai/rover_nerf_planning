@@ -9,7 +9,7 @@ from sklearn.neighbors import KernelDensity
 from sklearn.linear_model import LinearRegression
 from sklearn.kernel_ridge import KernelRidge
 
-from nerfnav.astar import AStar
+from rover_nerf.astar import AStar
 from collections import defaultdict
 
 

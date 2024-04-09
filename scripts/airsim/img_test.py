@@ -22,7 +22,7 @@ import plotly.express as px
 from PIL import Image
 import argparse
 
-from nerfnav.airsim_utils import airsim_pose_to_Rt
+from rover_nerf.airsim_utils import airsim_pose_to_Rt
 
 arg_parser = argparse.ArgumentParser(description="Take an image in airsim")
 arg_parser.add_argument("--mode", type=str, help="image mode (front, birdseye, stereo, depth)")   
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     time.sleep(0.2)
 
     mode = args.mode  # 'front', 'birdseye', 'stereo', 'depth'
-    path = 'C:/Users/Adam/NAVLAB/Neural-Implicits/nerfnav/data/airsim/images/rover/'
+    path = 'C:/Users/Adam/NAVLAB/Neural-Implicits/rover_nerf/data/airsim/images/rover/'
     timestamp = str(time.time())
 
     if mode == 'front':

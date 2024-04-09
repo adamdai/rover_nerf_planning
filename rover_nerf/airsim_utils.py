@@ -6,7 +6,7 @@ Utilities for AirSim API
 import numpy as np
 import airsim
 
-from nerfnav.utils import quat_to_R
+from rover_nerf.utils import quat_to_R
 
 
 def get_pose2D(client):

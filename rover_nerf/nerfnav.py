@@ -7,8 +7,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2 as cv
 
-from nerfnav.utils import wrap_angle
-from nerfnav.feature_map import depth_to_global
+from rover_nerf.utils import wrap_angle
+from rover_nerf.feature_map import depth_to_global
 
 
 def arc(x0, u, N, dt):
